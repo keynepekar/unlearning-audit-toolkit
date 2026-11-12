@@ -8,6 +8,7 @@ from pathlib import Path
 from .manifest import load_manifest
 from .metrics import compare_losses
 from .output import write_artifact
+from .report import load_metrics, render_report
 from .validation import load_losses
 
 
@@ -24,9 +25,17 @@ def main() -> int:
     compare.add_argument("--fpr", type=float, action="append", help="FPR target, repeatable")
     compare.add_argument("--bootstrap", type=int, default=400, help="bootstrap repeats, or 0 to disable")
     compare.add_argument("--seed", type=int, default=42)
+    report = commands.add_parser("report", help="render aggregate metrics as offline HTML")
+    report.add_argument("metrics_file", type=Path)
+    report.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
 
     try:
+        if args.command == "report":
+            html = render_report(load_metrics(args.metrics_file))
+            write_artifact(args.output, html, inputs=(args.metrics_file,))
+            print(f"Wrote report to {args.output}")
+            return 0
         export = load_losses(args.csv_file)
         manifest = load_manifest(args.manifest) if args.manifest else None
         if args.command == "compare":
