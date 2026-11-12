@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "unlearning-audit-toolkit"
+version = "0.1.0"
+description = "Compare aligned loss exports from machine unlearning experiments."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+license-files = ["LICENSE"]
+dependencies = []
+
+[project.scripts]
+unlearning-audit = "unlearning_audit.__main__:main"
+
+[project.urls]
+Repository = "https://github.com/keynepekar/unlearning-audit-toolkit"
+Issues = "https://github.com/keynepekar/unlearning-audit-toolkit/issues"
+
+[tool.setuptools.packages.find]
+include = ["unlearning_audit*"]
+
+[tool.setuptools.package-data]
+unlearning_audit = ["report.css"]
