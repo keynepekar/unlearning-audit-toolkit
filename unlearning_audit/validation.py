@@ -2,16 +2,30 @@
 
 import csv
 import math
+from dataclasses import dataclass
 from pathlib import Path
 
 COLUMNS = {"sample_id", "cohort", "model", "loss"}
-COHORTS = {"forget", "holdout"}
+REQUIRED_COHORTS = {"forget", "holdout"}
+COHORTS = REQUIRED_COHORTS | {"utility"}
 
 
-def validate_losses(path: Path) -> dict[str, int]:
-    """Return counts by cohort, raising ValueError for invalid input."""
+@dataclass(frozen=True)
+class LossExport:
+    """Aligned loss vectors in canonical sample-ID order within each cohort."""
+
+    sample_ids: dict[str, tuple[str, ...]]
+    losses: dict[str, dict[str, tuple[float, ...]]]
+
+    @property
+    def counts(self) -> dict[str, int]:
+        return {cohort: len(ids) for cohort, ids in self.sample_ids.items()}
+
+
+def load_losses(path: Path) -> LossExport:
+    """Read, validate and align the models in a long-form loss export."""
     samples: dict[str, str] = {}
-    models: dict[str, set[str]] = {}
+    models: dict[str, dict[str, float]] = {}
 
     with path.open(encoding="utf-8-sig", newline="") as stream:
         reader = csv.DictReader(stream, strict=True)
@@ -30,7 +44,7 @@ def validate_losses(path: Path) -> dict[str, int]:
             if not sample or not model:
                 raise ValueError(f"line {line}: sample_id and model must be non-empty")
             if cohort not in COHORTS:
-                raise ValueError(f"line {line}: cohort must be forget or holdout")
+                raise ValueError(f"line {line}: expected forget, holdout or utility cohort")
 
             try:
                 loss = float(row["loss"])
@@ -41,10 +55,10 @@ def validate_losses(path: Path) -> dict[str, int]:
 
             if samples.setdefault(sample, cohort) != cohort:
                 raise ValueError(f"line {line}: inconsistent cohort for sample {sample!r}")
-            seen = models.setdefault(model, set())
+            seen = models.setdefault(model, {})
             if sample in seen:
                 raise ValueError(f"line {line}: duplicate sample {sample!r} for model {model!r}")
-            seen.add(sample)
+            seen[sample] = loss
 
     if len(models) < 2:
         raise ValueError("expected at least two models")
@@ -53,9 +67,20 @@ def validate_losses(path: Path) -> dict[str, int]:
         if missing_count:
             raise ValueError(f"model {model!r} is missing {missing_count} sample(s)")
 
-    counts = dict.fromkeys(sorted(COHORTS), 0)
-    for cohort in samples.values():
-        counts[cohort] += 1
-    if not all(counts.values()):
+    if not REQUIRED_COHORTS.issubset(samples.values()):
         raise ValueError("both forget and holdout cohorts are required")
-    return counts
+
+    grouped: dict[str, list[str]] = {}
+    for sample, cohort in sorted(samples.items()):
+        grouped.setdefault(cohort, []).append(sample)
+    ids = {cohort: tuple(grouped[cohort]) for cohort in sorted(grouped)}
+    aligned = {
+        model: {cohort: tuple(values[sample] for sample in group) for cohort, group in ids.items()}
+        for model, values in sorted(models.items())
+    }
+    return LossExport(ids, aligned)
+
+
+def validate_losses(path: Path) -> dict[str, int]:
+    """Return validated sample counts by cohort."""
+    return load_losses(path).counts

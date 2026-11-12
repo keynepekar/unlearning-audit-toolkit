@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from unlearning_audit.validation import validate_losses
+from unlearning_audit.validation import load_losses, validate_losses
 
 ROOT = Path(__file__).resolve().parents[1]
 EXAMPLE = ROOT / "examples" / "losses.csv"
@@ -14,6 +14,13 @@ VALID = EXAMPLE.read_text(encoding="utf-8")
 class ValidationTests(unittest.TestCase):
     def test_valid_export(self):
         self.assertEqual(validate_losses(EXAMPLE), {"forget": 1, "holdout": 1})
+
+    def test_row_order_does_not_affect_alignment(self):
+        header, *rows = VALID.splitlines()
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "reversed.csv"
+            path.write_text("\n".join([header, *reversed(rows)]), encoding="utf-8")
+            self.assertEqual(load_losses(path), load_losses(EXAMPLE))
 
     def test_rejects_invalid_exports(self):
         cases = {
