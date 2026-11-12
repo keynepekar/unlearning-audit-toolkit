@@ -45,16 +45,16 @@ def split_examples(images: np.ndarray, labels: np.ndarray) -> dict[str, np.ndarr
     }
 
 
-def train(images: np.ndarray, labels: np.ndarray, indices: np.ndarray) -> SGDClassifier:
+def train(images: np.ndarray, labels: np.ndarray, indices: np.ndarray, training_seed: int) -> SGDClassifier:
     model = SGDClassifier(
-        loss="log_loss", learning_rate="constant", eta0=0.03, random_state=SEED, shuffle=False,
+        loss="log_loss", learning_rate="constant", eta0=0.03, random_state=training_seed, shuffle=False,
     )
-    update(model, images, labels, indices, TRAIN_EPOCHS)
+    update(model, images, labels, indices, TRAIN_EPOCHS, training_seed)
     return model
 
 
-def update(model, images, labels, indices, epochs):
-    rng = np.random.default_rng(SEED)
+def update(model, images, labels, indices, epochs, training_seed):
+    rng = np.random.default_rng(training_seed)
     classes = np.unique(labels)
     for _ in range(epochs):
         rows = rng.permutation(indices)
@@ -75,17 +75,17 @@ def export_losses(path, models, images, labels, groups):
                 writer.writerows((f"digit-{index:04d}", cohort, name, loss) for index, loss in zip(rows, losses))
 
 
-def run(output: Path, *, unchanged: bool) -> None:
+def run(output: Path, *, unchanged: bool, training_seed: int = SEED) -> None:
     output.mkdir(parents=True, exist_ok=False)
     pixels, labels = load_digits(return_X_y=True)
     groups = split_examples(pixels, labels)
     images = pixels / 16.0
     with threadpool_limits(limits=1):
-        original = train(images, labels, np.concatenate((groups["retain"], groups["forget"])))
+        original = train(images, labels, np.concatenate((groups["retain"], groups["forget"])), training_seed)
         candidate = deepcopy(original)
         if not unchanged:
-            update(candidate, images, labels, groups["retain"], UPDATE_EPOCHS)
-        reference = train(images, labels, groups["retain"])
+            update(candidate, images, labels, groups["retain"], UPDATE_EPOCHS, training_seed)
+        reference = train(images, labels, groups["retain"], training_seed)
         export_losses(
             output / "losses.csv",
             {"original": original, "candidate": candidate, "retrained": reference},
@@ -108,6 +108,8 @@ def run(output: Path, *, unchanged: bool) -> None:
             "utility": "Other half of the remaining evaluation partition, used to measure utility only.",
         },
         "provenance": {
+            "Protocol": "digits-sgd-unchanged-v1" if unchanged else "digits-sgd-retain-update-v1",
+            "Training seed": str(training_seed),
             "Dataset": "Optical Recognition of Handwritten Digits (Alpaydin and Kaynak, 1998), UCI DOI 10.24432/C50P49, CC BY 4.0, as bundled by scikit-learn.",
             "Split": f"Exact pixel duplicates removed before a stratified 60/40 train/evaluation split. Seed {SEED}.",
             "Training": f"SGD logistic classifier, {TRAIN_EPOCHS} epochs, constant learning rate 0.03, scaled pixels.",
@@ -118,7 +120,9 @@ def run(output: Path, *, unchanged: bool) -> None:
     }
     manifest_file = output / "manifest.json"
     write_artifact(manifest_file, json.dumps(manifest, ensure_ascii=False, indent=2) + "\n")
-    result = compare_losses(load_losses(output / "losses.csv"), load_manifest(manifest_file), seed=SEED)
+    result = compare_losses(
+        load_losses(output / "losses.csv"), load_manifest(manifest_file), seed=SEED, include_fingerprints=True,
+    )
     write_artifact(output / "metrics.json", json.dumps(result, ensure_ascii=False, indent=2) + "\n")
 
 
@@ -126,9 +130,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("output", type=Path, help="new directory for the CSV, manifest and metrics")
     parser.add_argument("--unchanged", action="store_true", help="use an unchanged candidate as a control")
+    parser.add_argument("--training-seed", type=int, default=SEED, help="training randomness; the split stays fixed")
     args = parser.parse_args()
+    if not 0 <= args.training_seed < 2**32:
+        parser.error("--training-seed must be between 0 and 4294967295")
     try:
-        run(args.output, unchanged=args.unchanged)
+        run(args.output, unchanged=args.unchanged, training_seed=args.training_seed)
     except OSError as error:
         parser.exit(1, f"Demo failed: {error}\n")
     print(f"Wrote demo artifacts to {args.output}")

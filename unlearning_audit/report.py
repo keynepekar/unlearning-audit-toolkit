@@ -173,7 +173,10 @@ def _chart(result: dict) -> str:
         dash = {"before": "", "candidate": ' stroke-dasharray="8 3"', "reference": ' stroke-dasharray="2 3"'}[role]
         paths.append(f'<polyline points="{points}" stroke="{COLORS[role]}"{dash}/>')
     return (
-        '<svg viewBox="0 0 550 356" role="img" aria-label="ROC curves for the three models">'
+        '<svg viewBox="0 0 550 356" role="img" aria-labelledby="roc-title roc-description">'
+        '<title id="roc-title">ROC curves for the three models</title>'
+        '<desc id="roc-description">Compare true-positive rates as the false-positive rate increases. '
+        'The diagonal shows chance-level ranking. The report also lists AUC values and operating points as text and tables.</desc>'
         + "".join(ticks)
         + f'<path class="chance" d="M{left} {bottom}L{left + width} {top}"/>'
         + "".join(paths)
@@ -210,7 +213,8 @@ def _operating_table(result: dict, *, calibrated: bool = False) -> str:
                 f'<td>{point["tpr"]:.2%} <small>({point["true_positives"]}/{counts["forget"]})</small></td></tr>'
             )
     return (
-        '<div class="table-wrap"><table><thead><tr><th scope="col">Model</th><th scope="col">FPR cap (rate)</th>'
+        '<div class="table-wrap" tabindex="0" role="region" aria-label="Operating point data">'
+        '<table><thead><tr><th scope="col">Model</th><th scope="col">FPR cap (rate)</th>'
         + calibration_header
         + '<th scope="col">Observed FPR</th><th scope="col">Observed TPR</th></tr></thead><tbody>'
         + "".join(rows) + "</tbody></table></div>"
@@ -239,7 +243,8 @@ def _differences(result: dict) -> str:
             f'<tr><th scope="row">{label}</th><td>{difference["estimate"]:+.3f}</td><td>{bounds}</td></tr>'
         )
     return (
-        '<div class="table-wrap"><table><thead><tr><th scope="col">Comparison</th><th scope="col">Δ AUC</th>'
+        '<div class="table-wrap" tabindex="0" role="region" aria-label="Paired AUC differences">'
+        '<table><thead><tr><th scope="col">Comparison</th><th scope="col">Δ AUC</th>'
         '<th scope="col">95% interval</th></tr></thead><tbody>' + "".join(entries) + "</tbody></table></div>"
     )
 
@@ -262,10 +267,30 @@ def _definitions(values: dict[str, str]) -> str:
     return "".join(f"<dt>{escape(key)}</dt><dd>{escape(text)}</dd>" for key, text in values.items())
 
 
+def render_document(title: str, content: str) -> str:
+    """Wrap rendered report content in the shared offline document shell."""
+    css = files(__package__).joinpath("report.css").read_text(encoding="utf-8")
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<title>{escape(title)} | Unlearning Audit Toolkit</title>
+<style>{css}</style>
+</head>
+<body>
+<main>
+{content}
+</main>
+</body>
+</html>
+"""
+
+
 def render_report(document: object) -> str:
     """Validate an aggregate audit document and render it without external assets."""
     result, manifest = validate_metrics(document)
-    css = files(__package__).joinpath("report.css").read_text(encoding="utf-8")
     title = escape(manifest.title)
     counts = result["counts"]
     warning_items = "".join(f"<li>{escape(message)}</li>" for message in result["warnings"])
@@ -274,18 +299,7 @@ def render_report(document: object) -> str:
         if warning_items else ""
     )
     bootstrap = result["bootstrap"]
-    return f"""<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
-<title>{title} | Unlearning Audit Toolkit</title>
-<style>{css}</style>
-</head>
-<body>
-<main>
-  <header class="hero">
+    return render_document(manifest.title, f"""  <header class="hero">
     <p class="project">Unlearning Audit Toolkit</p>
     <h1>{title}</h1>
     <p class="cohorts">{counts['forget']:,} forget examples <span aria-hidden="true">/</span> {counts['holdout']:,} held-out non-members</p>
@@ -299,8 +313,12 @@ def render_report(document: object) -> str:
     <section class="panel">
       <h2>Receiver operating characteristic</h2>
       <p>Lower loss ranks an example higher. The diagonal marks chance-level ranking.</p>
-      {_chart(result)}
-      <ul class="legend"><li class="before">Original</li><li class="candidate">Candidate</li><li class="reference">Retrained</li></ul>
+      <figure>
+        {_chart(result)}
+        <figcaption>
+          <ul class="legend"><li class="before">Original</li><li class="candidate">Candidate</li><li class="reference">Retrained</li></ul>
+        </figcaption>
+      </figure>
     </section>
     <section class="panel">
       <h2>Change in AUC</h2>
@@ -313,6 +331,7 @@ def render_report(document: object) -> str:
   <section class="panel">
     <h2>Operating points</h2>
     <p>Maximum observed true-positive rate within each false-positive cap on these same audit cohorts.</p>
+    <p class="table-hint">Scroll the tables sideways for more columns.</p>
     {_operating_table(result)}
   </section>
   {_calibration(result)}
@@ -322,10 +341,7 @@ def render_report(document: object) -> str:
     <p>{escape(manifest.loss_definition)}</p>
     <dl>{_definitions(manifest.cohorts)}{_definitions(manifest.provenance)}</dl>
   </section>
-</main>
-</body>
-</html>
-"""
+""")
 
 
 def load_metrics(path: Path) -> object:
@@ -353,4 +369,17 @@ def render_summary_csv(document: object) -> str:
                     point["false_positives"], counts["holdout"], point["fpr"],
                     point["true_positives"], counts["forget"], point["tpr"],
                 ))
+    return stream.getvalue()
+
+
+def render_roc_csv(document: object) -> str:
+    """Export the complete ROC paths in an accessible, machine-readable table."""
+    result, _ = validate_metrics(document)
+    stream = StringIO(newline="")
+    output = writer(stream, lineterminator="\n")
+    output.writerow(("role", "false_positives", "holdout_count", "fpr", "true_positives", "forget_count", "tpr"))
+    counts = result["counts"]
+    for role in ROLES:
+        for fp, tp in result["models"][role]["roc"]:
+            output.writerow((role, fp, counts["holdout"], fp / counts["holdout"], tp, counts["forget"], tp / counts["forget"]))
     return stream.getvalue()

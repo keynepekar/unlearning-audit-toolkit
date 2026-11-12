@@ -5,7 +5,7 @@ from pathlib import Path
 
 from unlearning_audit.manifest import load_manifest
 from unlearning_audit.metrics import compare_losses
-from unlearning_audit.report import render_report, render_summary_csv
+from unlearning_audit.report import render_report, render_roc_csv, render_summary_csv
 from unlearning_audit.validation import load_losses
 
 EXAMPLES = Path(__file__).resolve().parents[1] / "examples"
@@ -46,3 +46,9 @@ class ReportTests(unittest.TestCase):
         self.assertEqual(rows[0]["role"], "before")
         self.assertEqual(rows[0]["auc"], "1.0")
         self.assertEqual(rows[0]["calibration_count"], "")
+
+    def test_roc_csv_contains_all_curve_points(self):
+        rows = list(csv.DictReader(StringIO(render_roc_csv(self.metrics))))
+        self.assertEqual(len(rows), sum(len(model["roc"]) for model in self.metrics["models"].values()))
+        self.assertEqual((rows[0]["fpr"], rows[0]["tpr"]), ("0.0", "0.0"))
+        self.assertEqual((rows[-1]["fpr"], rows[-1]["tpr"]), ("1.0", "1.0"))

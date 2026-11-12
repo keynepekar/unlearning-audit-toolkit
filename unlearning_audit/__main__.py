@@ -8,7 +8,8 @@ from pathlib import Path
 from .manifest import load_manifest
 from .metrics import compare_losses
 from .output import write_artifact
-from .report import load_metrics, render_report, render_summary_csv
+from .report import load_metrics, render_report, render_roc_csv, render_summary_csv
+from .study import study_csv, study_html, summarize_study
 from .validation import load_losses
 from .verification import verify_comparison
 
@@ -30,16 +31,26 @@ def main() -> int:
     report = commands.add_parser("report", help="render aggregate metrics as HTML or summary CSV")
     report.add_argument("metrics_file", type=Path)
     report.add_argument("--output", type=Path, required=True)
-    report.add_argument("--format", choices=("html", "csv"), default="html")
+    report.add_argument("--format", choices=("html", "csv", "roc-csv"), default="html")
     verify = commands.add_parser("verify", help="replay fingerprinted metrics against the original inputs")
     verify.add_argument("metrics_file", type=Path)
     verify.add_argument("csv_file", type=Path)
     verify.add_argument("--manifest", type=Path, required=True)
+    study = commands.add_parser("study", help="summarize training repeats on a fixed split")
+    study.add_argument("metrics_files", type=Path, nargs="+")
+    study.add_argument("--output", type=Path, required=True)
+    study.add_argument("--format", choices=("json", "html", "csv"), default="json")
     args = parser.parse_args()
 
     try:
+        if args.command == "study":
+            summary = summarize_study(load_metrics(path) for path in args.metrics_files)
+            render_study = {"json": _json, "html": study_html, "csv": study_csv}[args.format]
+            write_artifact(args.output, render_study(summary), inputs=tuple(args.metrics_files))
+            print(f"Wrote study to {args.output}")
+            return 0
         if args.command == "report":
-            render = render_report if args.format == "html" else render_summary_csv
+            render = {"html": render_report, "csv": render_summary_csv, "roc-csv": render_roc_csv}[args.format]
             write_artifact(args.output, render(load_metrics(args.metrics_file)), inputs=(args.metrics_file,))
             print(f"Wrote report to {args.output}")
             return 0
@@ -55,7 +66,7 @@ def main() -> int:
                 repeats=args.bootstrap, seed=args.seed, include_fingerprints=args.fingerprints,
             )
             write_artifact(
-                args.output, json.dumps(result, indent=2, allow_nan=False) + "\n",
+                args.output, _json(result),
                 inputs=(args.csv_file, args.manifest),
             )
             print(f"Wrote metrics to {args.output}")
@@ -68,6 +79,10 @@ def main() -> int:
     counts = ", ".join(f"{count} {cohort}" for cohort, count in export.counts.items())
     print(f"Valid loss export: {counts}")
     return 0
+
+
+def _json(document: dict) -> str:
+    return json.dumps(document, indent=2, allow_nan=False) + "\n"
 
 
 if __name__ == "__main__":
