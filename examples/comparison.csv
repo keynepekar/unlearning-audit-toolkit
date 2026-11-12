@@ -1,0 +1,16 @@
+sample_id,cohort,model,loss
+f01,forget,initial,0.1
+f02,forget,initial,0.2
+h01,holdout,initial,0.8
+h02,holdout,initial,0.9
+u01,utility,initial,0.3
+f01,forget,updated,0.5
+f02,forget,updated,0.5
+h01,holdout,updated,0.5
+h02,holdout,updated,0.5
+u01,utility,updated,0.4
+f01,forget,retrained,0.6
+f02,forget,retrained,0.6
+h01,holdout,retrained,0.6
+h02,holdout,retrained,0.6
+u01,utility,retrained,0.5

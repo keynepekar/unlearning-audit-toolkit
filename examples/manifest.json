@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "title": "Illustrative loss export",
+  "loss_definition": "Hand-written non-negative values",
+  "models": {
+    "before": "initial",
+    "candidate": "updated",
+    "reference": "retrained"
+  },
+  "cohorts": {
+    "forget": "Illustrative rows marked for removal",
+    "holdout": "Illustrative unseen audit rows",
+    "utility": "Illustrative separate evaluation row"
+  },
+  "provenance": {
+    "data": "Hand-written fixture. No models were trained."
+  }
+}
