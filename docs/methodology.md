@@ -27,6 +27,28 @@ The manifest is a JSON object with `schema_version` set to `1`. Give the experim
 
 Use `--fpr` once per requested target. Defaults are 0.01 and 0.10. The comparison defaults to 400 bootstrap repeats and seed 42. The output JSON retains counts, rates, curves and intervals. HTML and CSV consume that saved JSON independently of the original exports.
 
+Use `report --format roc-csv` to export every plotted ROC point with its false-positive and true-positive counts. The HTML report provides text and tables alongside the chart. Its chart lines differ by both color and stroke pattern.
+
+## Verify a saved audit
+
+Add `--fingerprints` to `compare` to record SHA-256 digests for cohort assignments, model losses and the manifest. Then run:
+
+```sh
+unlearning-audit verify metrics.json losses.csv --manifest manifest.json
+```
+
+Fingerprints are computed on parsed values. Row order, JSON key order, and equivalent numeric spellings give the same digests. A change to an assignment, a numeric loss or a normalized manifest field changes the relevant digest. Verification checks those digests and recomputes the results with the saved targets and bootstrap settings. The format is identified by `unlearning-audit-sha256-v1`.
+
+Fingerprints establish consistency with a retained export. They do not authenticate the source of the files or establish that the declared cohorts are correct. A split digest can also link runs that used the same identifiers. Leave fingerprints disabled when sharing results that should not be linked.
+
+## Compare training repeats
+
+For a fixed-split study, create at least two comparisons with fingerprints. Put a distinct integer `Training seed` and a common `Protocol` in each manifest's `provenance`. Keep all other provenance fields, the loss definition, cohorts and FPR targets fixed. `study` rejects different split fingerprints, duplicate seeds and mismatched protocol metadata. The digits demo sets these fields automatically.
+
+The study reports individual run estimates, mean, sample standard deviation and observed range. Keep this dispersion separate from the paired bootstrap interval of an individual run. Training-seed runs reuse the same examples, and their range describes these fitted models on this split. It is not a confidence interval over data splits.
+
+In the six-seed digits example, the observed candidate-minus-original AUC range is −0.0080 to −0.0028. The candidate-minus-retrained range is +0.0089 to +0.0165. These are small changes in a comparison where the original model's AUC is already close to chance-level ranking. [Example study report](digits-study.png)
+
 ## Interpretation
 
 Look at the original model's separation first. When its AUC is already close to 0.5, the chosen loss score may have little power to show a change after unlearning. Results describe one score, one comparison protocol and the supplied model fits. They do not establish deletion, formal equivalence to retraining or legal compliance. Dependencies between observations can make sample-level intervals optimistic.
@@ -37,3 +59,5 @@ Look at the original model's separation first. When its AUC is already close to 
 - Carlini et al. (2022), [Membership Inference Attacks From First Principles](https://arxiv.org/abs/2112.03570). Discusses why performance at low false-positive rates matters.
 - Triantafillou et al. (2024), [Are we making progress in unlearning?](https://arxiv.org/abs/2406.09073). Describes the first NeurIPS unlearning challenge and comparison with retrained models.
 - Thaker et al. (2025), [LLM Unlearning Benchmarks are Weak Measures of Progress](https://arxiv.org/abs/2410.02879). Examines how dataset construction and evaluation can affect the interpretation of unlearning results.
+- Xu et al. (2026), [Unlearning Isn't Deletion](https://proceedings.mlr.press/v306/xu26cd.html). Studies reversibility in language models and the limitations of task-level metrics in that setting.
+- [NeurIPS Paper Checklist](https://neurips.cc/public/guides/PaperChecklist). Discusses documenting the sources of variability in reported statistics.

@@ -24,7 +24,9 @@ Open `report.html` in a browser. For downstream analysis, run `unlearning-audit 
 | --- | --- | --- |
 | `validate` | CSV and optional manifest | Cohort counts or a validation error |
 | `compare` | CSV and manifest | JSON with ROC curves, operating points, paired AUC differences and optional utility loss |
-| `report` | Saved metrics JSON | Offline HTML or a summary CSV |
+| `report` | Saved metrics JSON | Offline HTML, an operating-point summary, or the full ROC data as CSV |
+| `verify` | Fingerprinted metrics, CSV and manifest | Check that the inputs and replayed metrics match |
+| `study` | Fingerprinted metrics from repeated training runs | Compare AUC differences across seeds on one fixed split |
 
 ## Reproduce the screenshot
 
@@ -37,6 +39,15 @@ unlearning-audit report audit-demo/metrics.json --output audit-demo/report.html
 ```
 
 In the captured run, the original, candidate and retrained models had AUCs of 0.478, 0.470 and 0.461. Both paired intervals included zero. The original model already showed little separation by this score, which limits what the audit can establish about the candidate. Run the script with a second output directory and `--unchanged` to check the unchanged control.
+
+To repeat training on the same split with a different seed:
+
+```sh
+python examples/digits_demo.py audit-demo-43 --training-seed 43
+unlearning-audit study audit-demo/metrics.json audit-demo-43/metrics.json --format html --output study.html
+```
+
+The [six-run example](docs/digits-study.png) shows the range and mean of each paired AUC difference, with a table of per-seed values.
 
 See the [input contract and methodology](docs/methodology.md) for cohort definitions, metric interpretation, limitations and data attribution. Report files contain aggregate statistics. Keep per-example inputs in the audit environment.
 

@@ -35,3 +35,7 @@ jobs:
       - run: unlearning-audit validate demo/losses.csv --manifest demo/manifest.json
       - run: unlearning-audit report demo/metrics.json --output demo/report.html
       - run: unlearning-audit report demo/metrics.json --format csv --output demo/summary.csv
+      - run: unlearning-audit report demo/metrics.json --format roc-csv --output demo/roc.csv
+      - run: unlearning-audit verify demo/metrics.json demo/losses.csv --manifest demo/manifest.json
+      - run: python examples/digits_demo.py demo-43 --training-seed 43
+      - run: unlearning-audit study demo/metrics.json demo-43/metrics.json --format html --output study.html
