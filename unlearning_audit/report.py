@@ -1,12 +1,15 @@
 """Render a saved audit as a self-contained, offline HTML report."""
 
 import json
+from csv import writer
 from html import escape
 from importlib.resources import files
+from io import StringIO
 from pathlib import Path
 from sys import float_info
 
 from .manifest import ROLES, Manifest, _unique_fields
+from .metrics import RocPoint, area_under_roc, operating_points
 
 LABELS = {"before": "Original", "candidate": "Candidate", "reference": "Retrained"}
 COLORS = {"before": "#263d73", "candidate": "#006b60", "reference": "#a05a24"}
@@ -50,18 +53,29 @@ def _check_curve(points: object, holdout: int, forget: int) -> None:
         last_fp, last_tp = fp, tp
 
 
-def _check_operating_points(rows: object, holdout: int, forget: int) -> tuple[float, ...]:
+def _check_operating_points(
+    rows: object, holdout: int, forget: int, *, calibration: int | None = None
+) -> tuple[float, ...]:
     if not isinstance(rows, list) or not rows:
         raise ValueError("missing operating points")
     targets = []
+    fields = {"target_fpr", "fpr", "tpr", "false_positives", "true_positives"}
+    if calibration is not None:
+        fields.add("calibration_false_positives")
     for row in rows:
-        _mapping(row, {"target_fpr", "fpr", "tpr", "false_positives", "true_positives"}, "operating point")
+        _mapping(row, fields, "operating point")
         target = _number(row["target_fpr"], 0, 1, "target FPR")
         if not 0 < target < 1 or (targets and target <= targets[-1]):
             raise ValueError("FPR targets must increase strictly between 0 and 1")
         fp = _count(row["false_positives"], 0, holdout, "false positives")
         tp = _count(row["true_positives"], 0, forget, "true positives")
-        fpr = _number(row["fpr"], 0, target, "observed FPR")
+        maximum = target
+        if calibration is not None:
+            calibrated_fp = _count(row["calibration_false_positives"], 0, calibration, "calibration count")
+            if calibrated_fp / calibration > target:
+                raise ValueError("calibration count exceeds its FPR target")
+            maximum = 1
+        fpr = _number(row["fpr"], 0, maximum, "observed FPR")
         tpr = _number(row["tpr"], 0, 1, "observed TPR")
         if abs(fpr - fp / holdout) > 1e-12 or abs(tpr - tp / forget) > 1e-12:
             raise ValueError("operating point rates do not match counts")
@@ -82,14 +96,29 @@ def _validate_result(value: object) -> tuple[dict, Manifest]:
         _count(size, 1, 2**53 - 1, f"{cohort} count")
     models = _mapping(result["models"], set(ROLES), "models")
     targets = None
+    model_fields = {"auc", "roc", "operating_points", "mean_utility_loss"}
+    if "calibration" in counts:
+        model_fields.add("calibrated_points")
     for metrics in models.values():
-        _mapping(metrics, {"auc", "roc", "operating_points", "mean_utility_loss"}, "model metrics")
-        _number(metrics["auc"], 0, 1, "AUC")
+        _mapping(metrics, model_fields, "model metrics")
+        auc = _number(metrics["auc"], 0, 1, "AUC")
         _check_curve(metrics["roc"], counts["holdout"], counts["forget"])
+        roc = [RocPoint(*point) for point in metrics["roc"]]
+        if abs(auc - area_under_roc(roc)) > 1e-12:
+            raise ValueError("AUC does not match the ROC curve")
         observed = _check_operating_points(metrics["operating_points"], counts["holdout"], counts["forget"])
+        if metrics["operating_points"] != operating_points(roc, observed):
+            raise ValueError("descriptive operating points do not match the ROC curve")
         if targets is not None and observed != targets:
             raise ValueError("models must use the same FPR targets")
         targets = observed
+        if "calibration" in counts:
+            calibrated = _check_operating_points(
+                metrics["calibrated_points"], counts["holdout"], counts["forget"],
+                calibration=counts["calibration"],
+            )
+            if calibrated != targets:
+                raise ValueError("calibrated and descriptive FPR targets must match")
         utility = metrics["mean_utility_loss"]
         if "utility" in counts:
             _number(utility, 0, float_info.max, "mean utility loss")
@@ -97,9 +126,12 @@ def _validate_result(value: object) -> tuple[dict, Manifest]:
             raise ValueError("utility loss requires a utility cohort")
 
     deltas = _mapping(result["auc_deltas"], set(DELTA_LABELS), "AUC differences")
-    for delta in deltas.values():
+    for role in ("before", "reference"):
+        delta = deltas[f"candidate_minus_{role}"]
         _mapping(delta, {"estimate", "interval"}, "AUC difference")
-        _number(delta["estimate"], -1, 1, "AUC difference")
+        estimate = _number(delta["estimate"], -1, 1, "AUC difference")
+        if abs(estimate - (models["candidate"]["auc"] - models[role]["auc"])) > 1e-12:
+            raise ValueError("AUC difference does not match model AUCs")
         interval = delta["interval"]
         if interval is not None:
             if not isinstance(interval, list) or len(interval) != 2:
@@ -157,20 +189,40 @@ def _cards(result: dict, manifest: Manifest) -> str:
     )
 
 
-def _operating_table(result: dict) -> str:
+def _operating_table(result: dict, *, calibrated: bool = False) -> str:
     counts = result["counts"]
     rows = []
+    field = "calibrated_points" if calibrated else "operating_points"
+    calibration_header = '<th scope="col">Calibration FPR</th>' if calibrated else ""
     for role in ROLES:
-        for point in result["models"][role]["operating_points"]:
+        for point in result["models"][role][field]:
+            calibration_cell = ""
+            if calibrated:
+                events = point["calibration_false_positives"]
+                total = counts["calibration"]
+                calibration_cell = f"<td>{events / total:.2%} <small>({events}/{total})</small></td>"
             rows.append(
-                f'<tr><th scope="row">{LABELS[role]}</th><td>{point["target_fpr"]:.3g}</td>'
+                f'<tr><th scope="row">{LABELS[role]}</th><td>{point["target_fpr"]:.3g}</td>{calibration_cell}'
                 f'<td>{point["fpr"]:.2%} <small>({point["false_positives"]}/{counts["holdout"]})</small></td>'
                 f'<td>{point["tpr"]:.2%} <small>({point["true_positives"]}/{counts["forget"]})</small></td></tr>'
             )
     return (
         '<div class="table-wrap"><table><thead><tr><th scope="col">Model</th><th scope="col">FPR cap (rate)</th>'
-        '<th scope="col">Observed FPR</th><th scope="col">Observed TPR</th></tr></thead><tbody>'
+        + calibration_header
+        + '<th scope="col">Observed FPR</th><th scope="col">Observed TPR</th></tr></thead><tbody>'
         + "".join(rows) + "</tbody></table></div>"
+    )
+
+
+def _calibration(result: dict) -> str:
+    if "calibration" not in result["counts"]:
+        return ""
+    return (
+        '<section class="panel"><h2>Calibrated operating points</h2>'
+        '<p>Each threshold is selected using the separate calibration cohort. '
+        'The observed holdout FPR can exceed the calibration cap.</p>'
+        + _operating_table(result, calibrated=True)
+        + '</section>'
     )
 
 
@@ -260,6 +312,7 @@ def render_report(document: object) -> str:
     <p>Maximum observed true-positive rate within each false-positive cap on these same audit cohorts.</p>
     {_operating_table(result)}
   </section>
+  {_calibration(result)}
   {_utility(result)}
   <section class="panel">
     <h2>Experiment provenance</h2>
@@ -275,3 +328,26 @@ def render_report(document: object) -> str:
 def load_metrics(path: Path) -> object:
     with path.open(encoding="utf-8-sig") as stream:
         return json.load(stream, object_pairs_hook=_unique_fields)
+
+
+def render_summary_csv(document: object) -> str:
+    """Export operating points and model-level metrics for downstream analysis."""
+    result, _ = _validate_result(document)
+    stream = StringIO(newline="")
+    output = writer(stream, lineterminator="\n")
+    output.writerow((
+        "role", "method", "auc", "mean_utility_loss", "target_fpr", "calibration_false_positives",
+        "calibration_count", "false_positives", "holdout_count", "fpr", "true_positives", "forget_count", "tpr",
+    ))
+    counts = result["counts"]
+    for role in ROLES:
+        model = result["models"][role]
+        for method, field in (("descriptive", "operating_points"), ("calibrated", "calibrated_points")):
+            for point in model.get(field, []):
+                output.writerow((
+                    role, method, model["auc"], model["mean_utility_loss"], point["target_fpr"],
+                    point.get("calibration_false_positives"), counts["calibration"] if method == "calibrated" else None,
+                    point["false_positives"], counts["holdout"], point["fpr"],
+                    point["true_positives"], counts["forget"], point["tpr"],
+                ))
+    return stream.getvalue()

@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Self
 
+from .validation import COHORTS, REQUIRED_COHORTS
+
 ROLES = ("before", "candidate", "reference")
 
 
@@ -47,9 +49,9 @@ class Manifest:
             raise ValueError("models must assign before, candidate and reference")
         if len(set(mappings["models"].values())) != len(ROLES):
             raise ValueError("each model role must have a different name")
-        if "forget" not in mappings["cohorts"] or "holdout" not in mappings["cohorts"]:
+        if not REQUIRED_COHORTS.issubset(mappings["cohorts"]):
             raise ValueError("cohorts must describe forget and holdout")
-        if mappings["cohorts"].keys() - {"forget", "holdout", "utility"}:
+        if mappings["cohorts"].keys() - COHORTS:
             raise ValueError("unsupported cohort in manifest")
 
         return cls(

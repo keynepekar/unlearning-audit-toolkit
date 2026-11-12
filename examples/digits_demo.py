@@ -33,10 +33,16 @@ def split_examples(images: np.ndarray, labels: np.ndarray) -> dict[str, np.ndarr
         unique_rows, test_size=0.40, random_state=SEED, stratify=labels[unique_rows],
     )
     retain, forget = train_test_split(train, test_size=0.25, random_state=SEED, stratify=labels[train])
-    holdout, utility = train_test_split(
+    holdout, reserve = train_test_split(
         evaluation, test_size=0.35, random_state=SEED, stratify=labels[evaluation],
     )
-    return {"retain": retain, "forget": forget, "holdout": holdout, "utility": utility}
+    calibration, utility = train_test_split(
+        reserve, test_size=0.5, random_state=SEED, stratify=labels[reserve],
+    )
+    return {
+        "retain": retain, "forget": forget, "holdout": holdout,
+        "calibration": calibration, "utility": utility,
+    }
 
 
 def train(images: np.ndarray, labels: np.ndarray, indices: np.ndarray) -> SGDClassifier:
@@ -60,7 +66,7 @@ def export_losses(path, models, images, labels, groups):
         writer = csv.writer(stream, lineterminator="\n")
         writer.writerow(("sample_id", "cohort", "model", "loss"))
         for name, model in models.items():
-            for cohort in ("forget", "holdout", "utility"):
+            for cohort in ("forget", "holdout", "calibration", "utility"):
                 rows = groups[cohort]
                 probabilities = model.predict_proba(images[rows])
                 columns = np.searchsorted(model.classes_, labels[rows])
@@ -98,7 +104,8 @@ def run(output: Path, *, unchanged: bool) -> None:
         "cohorts": {
             "forget": "Stratified 25% of the original training partition. Used in original training only.",
             "holdout": "Stratified 65% of the evaluation partition. Excluded from all training.",
-            "utility": "Remaining 35% of the evaluation partition. Excluded from all training.",
+            "calibration": "One half of the remaining evaluation partition, used to select thresholds only.",
+            "utility": "Other half of the remaining evaluation partition, used to measure utility only.",
         },
         "provenance": {
             "Dataset": "Optical Recognition of Handwritten Digits (Alpaydin and Kaynak, 1998), UCI DOI 10.24432/C50P49, CC BY 4.0, as bundled by scikit-learn.",

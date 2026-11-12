@@ -7,7 +7,7 @@ from pathlib import Path
 
 COLUMNS = {"sample_id", "cohort", "model", "loss"}
 REQUIRED_COHORTS = {"forget", "holdout"}
-COHORTS = REQUIRED_COHORTS | {"utility"}
+COHORTS = REQUIRED_COHORTS | {"calibration", "utility"}
 
 
 @dataclass(frozen=True)
@@ -44,7 +44,7 @@ def load_losses(path: Path) -> LossExport:
             if not sample or not model:
                 raise ValueError(f"line {line}: sample_id and model must be non-empty")
             if cohort not in COHORTS:
-                raise ValueError(f"line {line}: expected forget, holdout or utility cohort")
+                raise ValueError(f"line {line}: expected one of {', '.join(sorted(COHORTS))}")
 
             try:
                 loss = float(row["loss"])

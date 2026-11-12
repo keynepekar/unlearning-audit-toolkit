@@ -1,9 +1,11 @@
+import csv
 import unittest
+from io import StringIO
 from pathlib import Path
 
 from unlearning_audit.manifest import load_manifest
 from unlearning_audit.metrics import compare_losses
-from unlearning_audit.report import render_report
+from unlearning_audit.report import render_report, render_summary_csv
 from unlearning_audit.validation import load_losses
 
 EXAMPLES = Path(__file__).resolve().parents[1] / "examples"
@@ -36,3 +38,11 @@ class ReportTests(unittest.TestCase):
         self.metrics["models"]["before"]["roc"][-1] = [2, 3]
         with self.assertRaisesRegex(ValueError, "curve endpoints"):
             render_report(self.metrics)
+
+    def test_summary_csv_has_fixed_roles_and_numeric_values(self):
+        self.metrics["manifest"]["title"] = "=1+2"
+        rows = list(csv.DictReader(StringIO(render_summary_csv(self.metrics))))
+        self.assertEqual(len(rows), 6)
+        self.assertEqual(rows[0]["role"], "before")
+        self.assertEqual(rows[0]["auc"], "1.0")
+        self.assertEqual(rows[0]["calibration_count"], "")

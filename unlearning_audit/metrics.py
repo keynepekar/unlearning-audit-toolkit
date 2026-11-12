@@ -6,6 +6,7 @@ from math import floor, isfinite
 from random import Random
 from statistics import mean
 
+from .calibration import calibrated_points
 from .manifest import ROLES, Manifest
 from .validation import LossExport
 
@@ -130,6 +131,10 @@ def compare_losses(
             "operating_points": operating_points(points, targets),
             "mean_utility_loss": mean(values["utility"]) if "utility" in values else None,
         }
+        if "calibration" in values:
+            models[role]["calibrated_points"] = calibrated_points(
+                values["forget"], values["holdout"], values["calibration"], targets
+            )
 
     intervals = paired_auc_intervals(vectors, repeats, seed)
     deltas = {
@@ -144,6 +149,10 @@ def compare_losses(
         f"{target:.4g} FPR is below the one-event resolution with {counts['holdout']} holdout examples."
         for target in targets if target < 1 / counts["holdout"]
     ]
+    warnings.extend(
+        f"{target:.4g} FPR is below the one-event resolution with {counts['calibration']} calibration examples."
+        for target in targets if "calibration" in counts and target < 1 / counts["calibration"]
+    )
     if min(counts["forget"], counts["holdout"]) < 20:
         warnings.append("At least one audit cohort has fewer than 20 examples. Estimates can be unstable.")
     if repeats and min(counts["forget"], counts["holdout"]) < 2:
