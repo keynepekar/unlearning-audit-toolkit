@@ -1,25 +1,49 @@
 # Unlearning Audit Toolkit
 
 [![Tests](https://github.com/keynepekar/unlearning-audit-toolkit/actions/workflows/tests.yml/badge.svg)](https://github.com/keynepekar/unlearning-audit-toolkit/actions/workflows/tests.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Check whether loss exports from a machine unlearning experiment are ready to compare. The validator checks that each model was evaluated on the same examples, with consistent cohort labels.
+Compare per-example losses from a machine unlearning experiment against the original model and a model retrained without the forget set. The toolkit checks that the examples line up, calculates aggregate audit statistics, and writes a standalone HTML report.
 
-## Validate a CSV
+![Audit report for three classifiers trained on the UCI handwritten digits dataset](docs/digits-report.png)
 
-Run from the repository root with Python 3.12 or later.
+## Quick start
+
+Use Python 3.12 or later. From a clone of the repository, install the toolkit and run the small example. The core package has no third-party runtime dependencies.
 
 ```sh
-python -m unlearning_audit validate examples/losses.csv
+python -m pip install .
+unlearning-audit validate examples/comparison.csv --manifest examples/manifest.json
+unlearning-audit compare examples/comparison.csv --manifest examples/manifest.json --output metrics.json
+unlearning-audit report metrics.json --output report.html
 ```
 
-The example contains hand-written values to illustrate the file format. Each row contains a sample ID, its cohort (`forget` or `holdout`), a model name, and a finite, non-negative per-sample loss. Include at least two models. Each model must have exactly one row for every sample.
+Open `report.html` in a browser. For downstream analysis, run `unlearning-audit report metrics.json --format csv --output summary.csv`. The example uses hand-written losses so the expected AUCs can be checked by inspection.
 
-Use `forget` for examples selected for removal and `holdout` for examples excluded from every model's training data. The validator checks the consistency of these labels across exports. Confirm their provenance in the training pipeline.
+| Command | Input | Result |
+| --- | --- | --- |
+| `validate` | CSV and optional manifest | Cohort counts or a validation error |
+| `compare` | CSV and manifest | JSON with ROC curves, operating points, paired AUC differences and optional utility loss |
+| `report` | Saved metrics JSON | Offline HTML or a summary CSV |
 
-## Tests
+## Reproduce the screenshot
+
+The demo trains three small classifiers on CPU and calls the toolkit's Python API. It uses the UCI Optical Recognition of Handwritten Digits dataset distributed with scikit-learn. Use a new output directory for each run.
+
+```sh
+python -m pip install -r examples/requirements-demo.txt
+python examples/digits_demo.py audit-demo
+unlearning-audit report audit-demo/metrics.json --output audit-demo/report.html
+```
+
+In the captured run, the original, candidate and retrained models had AUCs of 0.478, 0.470 and 0.461. Both paired intervals included zero. The original model already showed little separation by this score, which limits what the audit can establish about the candidate. Run the script with a second output directory and `--unchanged` to check the unchanged control.
+
+See the [input contract and methodology](docs/methodology.md) for cohort definitions, metric interpretation, limitations and data attribution. Report files contain aggregate statistics. Keep per-example inputs in the audit environment.
+
+## Development
 
 ```sh
 python -m unittest discover -s tests -v
 ```
 
-Licensed under the [MIT License](LICENSE).
+The source code is available under the [MIT License](LICENSE).
