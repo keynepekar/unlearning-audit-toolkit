@@ -1,14 +1,31 @@
 import unittest
 from pathlib import Path
+from random import Random
 
 from unlearning_audit.manifest import load_manifest
-from unlearning_audit.metrics import area_under_roc, compare_losses, operating_points, roc_counts
+from unlearning_audit.metrics import (
+    _loss_ranks, _resampled_auc, area_under_roc, compare_losses, operating_points, roc_counts,
+)
 from unlearning_audit.validation import load_losses
 
 EXAMPLES = Path(__file__).resolve().parents[1] / "examples"
 
 
 class MetricsTests(unittest.TestCase):
+    def test_resampled_auc_matches_explicit_roc_with_ties(self):
+        rng = Random(7)
+        for _ in range(30):
+            forget = tuple(rng.choices(range(5), k=7))
+            holdout = tuple(rng.choices(range(5), k=11))
+            ranks = _loss_ranks(forget, holdout)
+            for _ in range(10):
+                f = rng.choices(range(len(forget)), k=len(forget))
+                h = rng.choices(range(len(holdout)), k=len(holdout))
+                expected = area_under_roc(roc_counts(
+                    tuple(forget[i] for i in f), tuple(holdout[i] for i in h),
+                ))
+                self.assertEqual(_resampled_auc(ranks, f, h), expected)
+
     def test_roc_polarity_and_ties(self):
         self.assertEqual(area_under_roc(roc_counts((0.1,), (0.8,))), 1)
         self.assertEqual(area_under_roc(roc_counts((0.8,), (0.1,))), 0)

@@ -8,6 +8,7 @@ from io import StringIO
 from pathlib import Path
 from sys import float_info
 
+from .fingerprints import validate_fingerprints
 from .manifest import ROLES, Manifest, _unique_fields
 from .metrics import RocPoint, area_under_roc, operating_points
 
@@ -83,11 +84,13 @@ def _check_operating_points(
     return tuple(targets)
 
 
-def _validate_result(value: object) -> tuple[dict, Manifest]:
-    result = _mapping(
-        value, {"schema_version", "manifest", "counts", "models", "auc_deltas", "bootstrap", "warnings"},
-        "metrics",
-    )
+def validate_metrics(value: object) -> tuple[dict, Manifest]:
+    """Check a saved metrics document and its internally derived values."""
+    fields = {"schema_version", "manifest", "counts", "models", "auc_deltas", "bootstrap", "warnings"}
+    if isinstance(value, dict) and "fingerprints" in value:
+        validate_fingerprints(value["fingerprints"])
+        fields.add("fingerprints")
+    result = _mapping(value, fields, "metrics")
     if type(result["schema_version"]) is not int or result["schema_version"] != 1:
         raise ValueError("unsupported metrics schema_version (expected 1)")
     manifest = Manifest.from_dict(result["manifest"])
@@ -261,7 +264,7 @@ def _definitions(values: dict[str, str]) -> str:
 
 def render_report(document: object) -> str:
     """Validate an aggregate audit document and render it without external assets."""
-    result, manifest = _validate_result(document)
+    result, manifest = validate_metrics(document)
     css = files(__package__).joinpath("report.css").read_text(encoding="utf-8")
     title = escape(manifest.title)
     counts = result["counts"]
@@ -332,7 +335,7 @@ def load_metrics(path: Path) -> object:
 
 def render_summary_csv(document: object) -> str:
     """Export operating points and model-level metrics for downstream analysis."""
-    result, _ = _validate_result(document)
+    result, _ = validate_metrics(document)
     stream = StringIO(newline="")
     output = writer(stream, lineterminator="\n")
     output.writerow((

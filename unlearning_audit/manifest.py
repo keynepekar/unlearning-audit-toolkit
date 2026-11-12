@@ -25,6 +25,16 @@ class Manifest:
     provenance: dict[str, str]
     schema_version: int = 1
 
+    def as_dict(self) -> dict:
+        return {
+            "schema_version": self.schema_version,
+            "title": self.title,
+            "loss_definition": self.loss_definition,
+            "models": self.models,
+            "cohorts": self.cohorts,
+            "provenance": self.provenance,
+        }
+
     @classmethod
     def from_dict(cls, document: object) -> Self:
         fields = {"schema_version", "title", "loss_definition", "models", "cohorts", "provenance"}

@@ -7,6 +7,7 @@ from random import Random
 from statistics import mean
 
 from .calibration import calibrated_points
+from .fingerprints import fingerprint_inputs
 from .manifest import ROLES, Manifest
 from .validation import LossExport
 
@@ -69,6 +70,28 @@ def _percentile(sorted_values: list[float], fraction: float) -> float:
     return sorted_values[lower] + (position - lower) * (sorted_values[upper] - sorted_values[lower])
 
 
+def _loss_ranks(forget: tuple[float, ...], holdout: tuple[float, ...]) -> tuple[list[int], list[int], int]:
+    levels = {loss: rank for rank, loss in enumerate(sorted(set(forget) | set(holdout)))}
+    return [levels[loss] for loss in forget], [levels[loss] for loss in holdout], len(levels)
+
+
+def _resampled_auc(ranks: tuple[list[int], list[int], int], forget_idx: list[int], holdout_idx: list[int]) -> float:
+    forget_ranks, holdout_ranks, n_levels = ranks
+    forget_weights = [0] * n_levels
+    holdout_weights = [0] * n_levels
+    for index in forget_idx:
+        forget_weights[forget_ranks[index]] += 1
+    for index in holdout_idx:
+        holdout_weights[holdout_ranks[index]] += 1
+
+    # Each holdout counts earlier forget rows fully and tied rows at half weight.
+    earlier_forget = twice_area = 0
+    for forget, holdout in zip(forget_weights, holdout_weights):
+        twice_area += holdout * (2 * earlier_forget + forget)
+        earlier_forget += forget
+    return twice_area / (2 * len(forget_idx) * len(holdout_idx))
+
+
 def paired_auc_intervals(
     vectors: dict[str, dict[str, tuple[float, ...]]], repeats: int, seed: int
 ) -> dict[str, list[float] | None]:
@@ -81,16 +104,11 @@ def paired_auc_intervals(
 
     rng = Random(seed)
     differences: dict[str, list[float]] = {name: [] for name in comparisons}
+    ranks = {role: _loss_ranks(values["forget"], values["holdout"]) for role, values in vectors.items()}
     for _ in range(repeats):
         forget_idx = rng.choices(range(forget_n), k=forget_n)
         holdout_idx = rng.choices(range(holdout_n), k=holdout_n)
-        areas = {
-            role: area_under_roc(roc_counts(
-                tuple(values["forget"][index] for index in forget_idx),
-                tuple(values["holdout"][index] for index in holdout_idx),
-            ))
-            for role, values in vectors.items()
-        }
+        areas = {role: _resampled_auc(role_ranks, forget_idx, holdout_idx) for role, role_ranks in ranks.items()}
         differences["candidate_minus_before"].append(areas["candidate"] - areas["before"])
         differences["candidate_minus_reference"].append(areas["candidate"] - areas["reference"])
     return {
@@ -107,6 +125,7 @@ def compare_losses(
     targets: tuple[float, ...] = (0.01, 0.10),
     repeats: int = 400,
     seed: int = 42,
+    include_fingerprints: bool = False,
 ) -> dict:
     """Return an aggregate, JSON-compatible audit of three aligned model exports."""
     manifest.check_alignment(set(export.losses), set(export.sample_ids))
@@ -160,19 +179,15 @@ def compare_losses(
     if not repeats:
         warnings.append("Bootstrap intervals were disabled for this run.")
 
-    return {
+    result = {
         "schema_version": 1,
-        "manifest": {
-            "schema_version": manifest.schema_version,
-            "title": manifest.title,
-            "loss_definition": manifest.loss_definition,
-            "models": manifest.models,
-            "cohorts": manifest.cohorts,
-            "provenance": manifest.provenance,
-        },
+        "manifest": manifest.as_dict(),
         "counts": counts,
         "models": models,
         "auc_deltas": deltas,
         "bootstrap": {"repeats": repeats, "seed": seed},
         "warnings": warnings,
     }
+    if include_fingerprints:
+        result["fingerprints"] = fingerprint_inputs(export, manifest)
+    return result
