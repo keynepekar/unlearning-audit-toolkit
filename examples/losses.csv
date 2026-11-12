@@ -1,0 +1,5 @@
+sample_id,cohort,model,loss
+f01,forget,before,0.12
+h01,holdout,before,0.84
+f01,forget,after,0.67
+h01,holdout,after,0.78
