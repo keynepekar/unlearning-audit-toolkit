@@ -28,6 +28,15 @@ Open `report.html` in a browser. For downstream analysis, run `unlearning-audit 
 | `verify` | Fingerprinted metrics, CSV and manifest | Check that the inputs and replayed metrics match |
 | `study` | Fingerprinted metrics from repeated training runs | Compare AUC differences across seeds on one fixed split |
 
+### Install the release wheel
+
+Download the `.whl` file from the [v0.5.1 release](https://github.com/keynepekar/unlearning-audit-toolkit/releases/tag/v0.5.1). From its download directory, use the GitHub CLI to verify the wheel's build provenance before installing:
+
+```sh
+gh attestation verify unlearning_audit_toolkit-0.5.1-py3-none-any.whl --repo keynepekar/unlearning-audit-toolkit --source-ref refs/tags/v0.5.1
+python -m pip install --no-index --no-deps unlearning_audit_toolkit-0.5.1-py3-none-any.whl
+```
+
 ## Reproduce the screenshot
 
 The demo trains three small classifiers on CPU and calls the toolkit's Python API. It uses the UCI Optical Recognition of Handwritten Digits dataset distributed with scikit-learn. Use a new output directory for each run.
@@ -52,6 +61,8 @@ The [six-run example](docs/digits-study.png) shows the range and mean of each pa
 ## When ROC AUC misses a change
 
 The [ridge control experiment](docs/ridge-controls.md) compares an exact update with an unchanged model. Both have the same ROC AUC on the synthetic benchmark. The paired loss gaps and the independently retrained model reveal the difference.
+
+The [holdout sensitivity experiment](docs/holdout-sensitivity.md) keeps the models and forget examples fixed. Changing only the holdout shifts the mean retrained-model AUC from 0.170 to 0.808 across the three conditions.
 
 The [ridge benchmark](docs/ridge-benchmark.md) tests when the update agrees with an independent refit, where floating-point cancellation breaks that agreement, and how the runtime changes with deletion size.
 

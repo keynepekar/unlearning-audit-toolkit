@@ -73,9 +73,12 @@ def audit_control(
     *,
     exact: bool,
     seed: int,
+    holdout_scale: float = 1.0,
 ) -> dict:
     name = "downdated" if exact else "unchanged"
     title = "Ridge deletion · exact control" if exact else "Ridge deletion · unchanged control"
+    if holdout_scale != 1.0:
+        title += f" · holdout scaled by {holdout_scale:g}"
     selected = {
         "original": models["original"],
         name: models["downdated"] if exact else models["original"],
@@ -89,8 +92,11 @@ def audit_control(
         for role, weights in selected.items():
             for cohort in ("forget", "holdout", "utility"):
                 x, y = data[cohort]
+                prefix = cohort
+                if cohort == "holdout" and holdout_scale != 1.0:
+                    prefix = f"holdout-{holdout_scale:g}"
                 for index, loss in enumerate((x @ weights - y) ** 2):
-                    output.writerow((f"{cohort}-{index:03d}", cohort, role, loss))
+                    output.writerow((f"{prefix}-{index:03d}", cohort, role, loss))
 
     metadata = {
         "schema_version": 1,
@@ -99,7 +105,11 @@ def audit_control(
         "models": {"before": "original", "candidate": name, "reference": "retrained"},
         "cohorts": {
             "forget": "Original training rows along the second feature direction.",
-            "holdout": "Independent draws along the same second feature direction.",
+            "holdout": (
+                "Independent draws along the same second feature direction."
+                if holdout_scale == 1.0 else
+                f"Independent draws along the second feature direction, with features and targets scaled by {holdout_scale:g}."
+            ),
             "utility": "Independent draws along the retained first feature direction.",
         },
         "provenance": {

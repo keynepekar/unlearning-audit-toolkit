@@ -4,6 +4,8 @@ The experimental block QR implementation retains a local copy of the training ro
 
 The [v0.5.0 results archive](https://github.com/keynepekar/unlearning-audit-toolkit/releases/download/v0.5.0/research-results-v05.zip) contains the recorded policy traces and calibration, the block-size comparison, and both Wine experiments. The commands below regenerate the separate synthetic sequential benchmark and the prediction controls.
 
+The [v0.5.1 validation archive](https://github.com/keynepekar/unlearning-audit-toolkit/releases/download/v0.5.1/validation-results-v051.zip) contains the follow-up held-out replay, bootstrap coverage simulation, repeated timing and memory measurements, and holdout sensitivity results.
+
 ## Run the synthetic experiment
 
 ```sh
@@ -94,7 +96,3 @@ python examples/bootstrap_coverage.py bootstrap-coverage.json
 ```
 
 The simulation uses paired differences with known mean 0.2, equal groups of eight rows, and 600 datasets per scenario. It compares percentile intervals from 799 draws that resample individual rows or whole groups. Across the correlated scenarios, coverage was 53–72% for row sampling and 89–94% for group sampling at nominal 95%. Results apply to this simulation and the mean paired difference. They do not measure coverage for AUC or establish validity for arbitrary group structures. [Field and Welsh, Bootstrapping clustered data](https://doi.org/10.1111/j.1467-9868.2007.00593.x)
-
-## Wheel verification
-
-The Wheel provenance workflow builds and smoke tests the wheel, attests its SHA-256 digest, verifies the attestation and uploads the wheel as a workflow artifact. Download the wheel from the run and execute `gh attestation verify path/to/wheel.whl --repo keynepekar/unlearning-audit-toolkit`. [Verified workflow run](https://github.com/keynepekar/unlearning-audit-toolkit/actions/runs/43375466641) · [GitHub CLI verification](https://cli.github.com/manual/gh_attestation_verify)

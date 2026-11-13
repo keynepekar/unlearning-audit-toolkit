@@ -71,6 +71,8 @@ unlearning-audit study seed-study/seed-*/metrics.json --format html --output see
 
 Look at the original model's separation first. When its AUC is already close to 0.5, the chosen loss score may have little power to show a change after unlearning. Results describe one score, one comparison protocol and the supplied model fits. They do not establish deletion, formal equivalence to retraining or legal compliance. Dependencies between observations can make sample-level intervals optimistic.
 
+Check separation on the retrained model as well. Both audit cohorts should be absent from its training data. An AUC far from 0.5 in either direction warrants checking how the cohorts were selected and whether their class, difficulty or duplicate profiles differ. AUC near 0.5 can also arise when differences cancel in the ranking statistic. Document these checks before interpreting the candidate's AUC. The [holdout sensitivity experiment](holdout-sensitivity.md) illustrates this with an exact deletion and two deliberately shifted holdouts.
+
 ## Demo data and references
 
 The [implementation references](sources.md) map methods to their sources and code.
