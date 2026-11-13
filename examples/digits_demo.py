@@ -1,7 +1,6 @@
 """Train three small classifiers and audit their outputs with the installed package."""
 
 import argparse
-import csv
 import json
 import platform
 from copy import deepcopy
@@ -14,6 +13,7 @@ from sklearn.datasets import load_digits
 from sklearn.linear_model import SGDClassifier
 from sklearn.model_selection import train_test_split
 from threadpoolctl import threadpool_limits
+from sklearn_export import export_losses as export_classification_losses
 
 from unlearning_audit.manifest import load_manifest
 from unlearning_audit.metrics import compare_losses
@@ -62,17 +62,12 @@ def update(model, images, labels, indices, epochs, training_seed):
 
 
 def export_losses(path, models, images, labels, groups):
-    with path.open("w", encoding="utf-8", newline="") as stream:
-        writer = csv.writer(stream, lineterminator="\n")
-        writer.writerow(("sample_id", "cohort", "model", "loss"))
-        for name, model in models.items():
-            for cohort in ("forget", "holdout", "calibration", "utility"):
-                rows = groups[cohort]
-                probabilities = model.predict_proba(images[rows])
-                columns = np.searchsorted(model.classes_, labels[rows])
-                true_probabilities = probabilities[np.arange(len(rows)), columns]
-                losses = -np.log(np.maximum(true_probabilities, 1e-15))
-                writer.writerows((f"digit-{index:04d}", cohort, name, loss) for index, loss in zip(rows, losses))
+    cohorts = {
+        cohort: ([f"digit-{index:04d}" for index in groups[cohort]],
+                 images[groups[cohort]], labels[groups[cohort]])
+        for cohort in ("forget", "holdout", "calibration", "utility")
+    }
+    export_classification_losses(path, models, cohorts)
 
 
 def run(output: Path, *, unchanged: bool, training_seed: int = SEED) -> None:

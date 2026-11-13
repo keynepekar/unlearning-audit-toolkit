@@ -24,6 +24,8 @@ python examples/wine_experiment.py winequality-red.csv wine-results
 
 The script verifies the expected SHA-256, removes duplicate full rows before splitting, uses the original quality score, and adds a penalized intercept. It reports separate results for four train/test splits, two removal fractions, and random or nearest-neighbor selection. Distances use standard deviations from the full training split for selection only. The model uses fixed raw features. The UCI dataset is by Cortez et al. (2009), licensed CC BY 4.0, DOI [10.24432/C56S3T](https://doi.org/10.24432/C56S3T). [License](https://creativecommons.org/licenses/by/4.0/)
 
+`python examples/wine_neighbors.py winequality-red.csv neighbors.csv` compares a refit after deleting one anchor row with a refit after deleting that anchor and nine nearest training rows. Across ten split seeds, the mean absolute difference between the two refitted anchor predictions was 0.00415 and the maximum was 0.0100. This is an example of how the choice of deletion set affects a model under one ridge objective, rather than a test of deletion guarantees.
+
 For the initial random-selection run, the largest relative holdout prediction errors versus the SVD refit were 3.35 × 10⁻¹⁴ for Gram and 4.93 × 10⁻¹⁵ for block QR. Splits may share observations across runs. Deduplicating full rows permits identical features with different targets to occur in different splits.
 
 ## Scope
@@ -40,6 +42,8 @@ python examples/prediction_controls.py
 The policy experiment adds concentrated and dispersed removal patterns and compares continuous subtraction, reconstruction every ten requests, reconstruction when the updated Gram matrix condition number exceeds 10¹⁰, and cached block QR. It records each request and a summary with total, median and 95th percentile update times. Initial setup is excluded. The fixed threshold is exploratory and has not been calibrated on held-out sequences. QR block factors retain access to the original rows.
 
 In the recorded full run, each method has 216 sequences. All 216 sequences in each Gram policy exceeded the coefficient or prediction tolerance at least once. Block QR exceeded it in 50 sequences. The condition rule rebuilt 11,551 times across its sequences. These deliberately high-leverage cases demonstrate a limitation of that threshold and of the normal-equation solve. They are not a general estimate of production reliability.
+
+`python examples/calibrate_condition.py policies/steps.csv calibration.json` evaluates six condition thresholds retrospectively using seeds 42–44 to choose a threshold and 45–47 to evaluate it. It chooses 10⁴ by minimizing missed failures and then false alerts. The held-out steps contain 5,940 failures, of which 30 are missed, and no non-failure steps. Thus this dataset cannot estimate a false-alert rate. The rows were generated under the fixed 10¹⁰ reconstruction policy, so this exercise does not measure how a different threshold would alter subsequent model states.
 
 ![Tolerance failures across the four reconstruction policies](policy-results.svg)
 

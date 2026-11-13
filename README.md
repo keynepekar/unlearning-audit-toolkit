@@ -57,6 +57,8 @@ The [ridge benchmark](docs/ridge-benchmark.md) tests when the update agrees with
 
 The [sequential experiment](docs/sequential-experiment.md) compares repeated updates with an SVD refit after each request, including a reproducible example on UCI Wine Quality.
 
+The reusable [scikit-learn export example](examples/sklearn_export.py) converts fitted probability classifiers and labeled cohorts to the toolkit's CSV format. The digits demo uses it.
+
 See the [input contract and methodology](docs/methodology.md) for cohort definitions, metric interpretation, limitations and data attribution. Report files contain aggregate statistics. Keep per-example inputs in the audit environment.
 
 The [sources and implementation notes](docs/sources.md) link each major method to its reference, source file and local design choices.
