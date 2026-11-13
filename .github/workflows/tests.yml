@@ -52,3 +52,6 @@ jobs:
       - run: python examples/prediction_controls.py
       - run: python examples/block_costs.py block-costs
       - run: python examples/plot_policy_results.py policies/summary.csv policies/chart.svg
+      - run: python examples/validate_reconstruction.py reconstruction.json --quick
+      - run: python examples/bootstrap_coverage.py coverage.json --quick
+      - run: python examples/repeated_costs.py repeated-costs.json --quick

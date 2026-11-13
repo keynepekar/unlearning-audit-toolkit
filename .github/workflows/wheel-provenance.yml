@@ -1,0 +1,43 @@
+name: Wheel provenance
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+  id-token: write
+  attestations: write
+
+jobs:
+  wheel:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12'
+      - name: Build and smoke test the wheel
+        run: |
+          python -m pip wheel --no-deps --wheel-dir dist .
+          python -m venv "${RUNNER_TEMP}/audit-wheel"
+          bin="${RUNNER_TEMP}/audit-wheel/bin"
+          "$bin/python" -m pip install --no-index --no-deps dist/*.whl
+          "$bin/unlearning-audit" compare examples/comparison.csv --manifest examples/manifest.json --fingerprints --output metrics.json
+          "$bin/unlearning-audit" verify metrics.json examples/comparison.csv --manifest examples/manifest.json
+          "$bin/unlearning-audit" report metrics.json --output report.html
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: 'dist/*.whl'
+      - name: Verify the build attestation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh attestation verify dist/*.whl --repo "$GITHUB_REPOSITORY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: attested-wheel
+          path: dist/*.whl
+          if-no-files-found: error
