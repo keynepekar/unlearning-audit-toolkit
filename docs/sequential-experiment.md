@@ -22,9 +22,9 @@ Download the red wine CSV from [UCI Wine Quality](https://archive.ics.uci.edu/da
 python examples/wine_experiment.py winequality-red.csv wine-results
 ```
 
-The script verifies the expected SHA-256, removes duplicate full rows before splitting, uses the original quality score, and adds a penalized intercept. It reports separate results for four train/test splits and two removal fractions. The UCI dataset is by Cortez et al. (2009), licensed CC BY 4.0, DOI [10.24432/C56S3T](https://doi.org/10.24432/C56S3T). [License](https://creativecommons.org/licenses/by/4.0/)
+The script verifies the expected SHA-256, removes duplicate full rows before splitting, uses the original quality score, and adds a penalized intercept. It reports separate results for four train/test splits, two removal fractions, and random or nearest-neighbor selection. Distances use standard deviations from the full training split for selection only. The model uses fixed raw features. The UCI dataset is by Cortez et al. (2009), licensed CC BY 4.0, DOI [10.24432/C56S3T](https://doi.org/10.24432/C56S3T). [License](https://creativecommons.org/licenses/by/4.0/)
 
-For the recorded run, the largest relative holdout prediction errors versus the SVD refit were 3.35 × 10⁻¹⁴ for Gram and 4.93 × 10⁻¹⁵ for block QR. Splits may share observations across runs. The example uses random deletion rather than a similarity-based deletion study.
+For the initial random-selection run, the largest relative holdout prediction errors versus the SVD refit were 3.35 × 10⁻¹⁴ for Gram and 4.93 × 10⁻¹⁵ for block QR. Splits may share observations across runs. Deduplicating full rows permits identical features with different targets to occur in different splits.
 
 ## Scope
 
