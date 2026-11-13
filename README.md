@@ -53,6 +53,8 @@ The [six-run example](docs/digits-study.png) shows the range and mean of each pa
 
 The [ridge control experiment](docs/ridge-controls.md) compares an exact update with an unchanged model. Both have the same ROC AUC on the synthetic benchmark. The paired loss gaps and the independently retrained model reveal the difference.
 
+The [ridge benchmark](docs/ridge-benchmark.md) tests when the update agrees with an independent refit, where floating-point cancellation breaks that agreement, and how the runtime changes with deletion size.
+
 See the [input contract and methodology](docs/methodology.md) for cohort definitions, metric interpretation, limitations and data attribution. Report files contain aggregate statistics. Keep per-example inputs in the audit environment.
 
 ## Development
