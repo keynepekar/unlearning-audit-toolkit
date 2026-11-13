@@ -46,3 +46,11 @@ In the recorded full run, each method has 216 sequences. All 216 sequences in ea
 Generate the chart from the output with \`python examples/plot_policy_results.py policies/summary.csv policies/results.svg\`.
 
 The prediction controls construct equal squared losses with predictions on opposite sides of the target. Their AUC and paired loss gap are identical, while the mean prediction gap is one unit. A one-row change also shows how a 95th percentile can miss a rare deviation. These examples motivate inspecting both per-group and worst-case behavior.
+
+## Block size and locality
+
+```sh
+python examples/block_costs.py block-results
+```
+
+The 324 scenarios compare three block sizes and two locations for a single removal of 100 rows. In the recorded run, median touched-block counts were 4, 2 and 1 for concentrated removal with block sizes 32, 64 and 128. The corresponding dispersed counts were 30, 16 and 8. The CSV reports setup and update times separately from an SVD refit, plus coefficient and prediction errors. Each time is a single observation, so the timings are exploratory and do not include measurement uncertainty.

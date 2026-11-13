@@ -50,3 +50,5 @@ jobs:
       - run: python examples/summarize_sequences.py sequential/sequences.csv sequential/summary.csv
       - run: python examples/reconstruction_policies.py policies --quick
       - run: python examples/prediction_controls.py
+      - run: python examples/block_costs.py block-costs
+      - run: python examples/plot_policy_results.py policies/summary.csv policies/chart.svg
