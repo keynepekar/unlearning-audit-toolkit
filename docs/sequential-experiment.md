@@ -64,3 +64,37 @@ python examples/block_costs.py block-results
 ```
 
 The 324 scenarios compare three block sizes and two locations for a single removal of 100 rows. In the recorded run, median touched-block counts were 4, 2 and 1 for concentrated removal with block sizes 32, 64 and 128. The corresponding dispersed counts were 30, 16 and 8. The CSV reports setup and update times separately from an SVD refit, plus coefficient and prediction errors. Each time is a single observation, so the timings are exploratory and do not include measurement uncertainty.
+
+## Held-out policy replay and order comparison
+
+```sh
+python examples/validate_reconstruction.py reconstruction-heldout.json
+```
+
+The replay uses both ordinary and high-leverage data, three spectrum ratios, two penalties and 10 or 100 requests. Calibration uses seeds 42–44 and maximizes balanced accuracy over six thresholds on uninterrupted Gram traces. Seeds 45–52 evaluate the chosen threshold by actually rebuilding the statistics when it fires. An alert is evaluated against the error of the Gram solve immediately before the rebuild. The same SVD reference also measures the error after that decision.
+
+The chosen threshold was 10¹⁰. In 31,680 held-out steps, 17,782 alerts coincided with a pre-rebuild failure, 36 were false alerts, 564 failures were missed, and 13,298 steps had neither an alert nor a failure. After the policy ran, 18,329 steps still exceeded the tolerance. The condition number detects many problematic solves in this grid. Rebuilding Gram statistics still leaves the numerical limits of the normal equations.
+
+The 576 held-out sequences include forward, reverse and shuffled requests that remove the same 100 rows. Final block QR matched single-request block QR exactly on this machine. The largest final relative prediction error against an independent SVD refit was 2.67 × 10⁻¹². The JSON also records the final errors for single-request Gram and the sequential Gram policy.
+
+## Repeated costs and process memory
+
+```sh
+python examples/repeated_costs.py repeated-costs.json
+```
+
+The full profile runs 36 isolated workers, with one warm-up and 11 measured repetitions per worker. It records setup and update times separately. The memory figure is the process high-water mark, including imports and inputs. Windows reports peak working set and Linux reports peak resident memory. Compare measurements within the same operating system and environment.
+
+For 24,000 rows, 64 features and 10% deletion, the median update time on the recorded Windows run was 9.70 ms for concentrated QR removal and 29.03 ms for dispersed QR removal. Corresponding SVD refits took 81.52 ms and 77.49 ms. QR setup took about 22 ms in each case. Peak process memory was 153–158 MiB for QR and about 185–186 MiB for SVD. These results describe one CPU environment.
+
+## Cluster bootstrap coverage
+
+```sh
+python examples/bootstrap_coverage.py bootstrap-coverage.json
+```
+
+The simulation uses paired differences with known mean 0.2, equal groups of eight rows, and 600 datasets per scenario. It compares percentile intervals from 799 draws that resample individual rows or whole groups. Across the correlated scenarios, coverage was 53–72% for row sampling and 89–94% for group sampling at nominal 95%. Results apply to this simulation and the mean paired difference. They do not measure coverage for AUC or establish validity for arbitrary group structures. [Field and Welsh, Bootstrapping clustered data](https://doi.org/10.1111/j.1467-9868.2007.00593.x)
+
+## Wheel verification
+
+The Wheel provenance workflow builds and smoke tests the wheel, attests its SHA-256 digest, verifies the attestation and uploads the wheel as a workflow artifact. Download the wheel from the run and execute `gh attestation verify path/to/wheel.whl --repo keynepekar/unlearning-audit-toolkit`. [Verified workflow run](https://github.com/keynepekar/unlearning-audit-toolkit/actions/runs/43375466641) · [GitHub CLI verification](https://cli.github.com/manual/gh_attestation_verify)
