@@ -5,6 +5,8 @@ from pathlib import Path
 
 import numpy as np
 
+from unlearning_audit.validation import COHORTS, REQUIRED_COHORTS
+
 
 def export_losses(path: Path, models: dict, cohorts: dict):
     """Write aligned cross-entropy losses from fitted probability classifiers.
@@ -12,8 +14,16 @@ def export_losses(path: Path, models: dict, cohorts: dict):
     cohorts maps names to (sample IDs, feature matrix, labels). The caller
     establishes data provenance and membership independently.
     """
-    if len(models) < 2 or not {"forget", "holdout"}.issubset(cohorts):
+    if len(models) < 2 or not REQUIRED_COHORTS.issubset(cohorts):
         raise ValueError("at least two models and forget/holdout cohorts are required")
+    if not set(cohorts).issubset(COHORTS):
+        raise ValueError("unknown cohort name")
+    model_names = tuple(models)
+    if any(not isinstance(name, str) or not name.strip() for name in model_names):
+        raise ValueError("model names must be nonempty strings")
+    normalized_names = tuple(name.strip() for name in model_names)
+    if len(set(normalized_names)) != len(normalized_names):
+        raise ValueError("model names must be unique after trimming")
     prepared = []
     ids_seen = set()
     for name, (ids, x, y) in cohorts.items():
@@ -29,7 +39,7 @@ def export_losses(path: Path, models: dict, cohorts: dict):
         ids_seen.update(ids)
         prepared.append((name, ids, x, y))
     output = []
-    for model_name, model in models.items():
+    for model_name, model in zip(normalized_names, models.values(), strict=True):
         for cohort, ids, x, y in prepared:
             probabilities = np.asarray(model.predict_proba(x))
             classes = list(model.classes_)

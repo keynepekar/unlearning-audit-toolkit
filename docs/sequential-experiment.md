@@ -2,6 +2,8 @@
 
 The experimental block QR implementation retains a local copy of the training rows and caches a factor for each block. A deletion recomputes factors for touched blocks and solves using the combined factors and one ridge regularization term. The example is intended for numerical comparison. Input arrays and factors remain in memory and are included separately in its byte counts.
 
+The [v0.5.0 results archive](https://github.com/keynepekar/unlearning-audit-toolkit/releases/download/v0.5.0/research-results-v05.zip) contains the recorded policy traces and calibration, the block-size comparison, and both Wine experiments. The commands below regenerate the separate synthetic sequential benchmark and the prediction controls.
+
 ## Run the synthetic experiment
 
 ```sh
@@ -47,7 +49,11 @@ In the recorded full run, each method has 216 sequences. All 216 sequences in ea
 
 ![Tolerance failures across the four reconstruction policies](policy-results.svg)
 
-Generate the chart from the output with \`python examples/plot_policy_results.py policies/summary.csv policies/results.svg\`.
+Generate the chart from the output:
+
+```sh
+python examples/plot_policy_results.py policies/summary.csv policies/results.svg
+```
 
 The prediction controls construct equal squared losses with predictions on opposite sides of the target. Their AUC and paired loss gap are identical, while the mean prediction gap is one unit. A one-row change also shows how a 95th percentile can miss a rare deviation. These examples motivate inspecting both per-group and worst-case behavior.
 

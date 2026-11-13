@@ -31,3 +31,14 @@ class SklearnExportTests(unittest.TestCase):
             cohorts["holdout"] = (["a", "d"], x[2:], y[2:])
             with self.assertRaisesRegex(ValueError, "unique"):
                 export_losses(Path(directory) / "invalid.csv", models, cohorts)
+
+    def test_metadata_validation_precedes_prediction_and_writing(self):
+        models = {"first": None, "second": None}
+        cohorts = {"forget": None, "holdout": None}
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "invalid.csv"
+            with self.assertRaisesRegex(ValueError, "unknown cohort"):
+                export_losses(path, models, cohorts | {"test": None})
+            with self.assertRaisesRegex(ValueError, "unique after trimming"):
+                export_losses(path, {"first": None, " first ": None}, cohorts)
+            self.assertFalse(path.exists())

@@ -13,6 +13,16 @@ from threadpoolctl import threadpool_limits
 from wine_experiment import ALPHA, EXPECTED_SHA256
 
 
+def anchor_group(train, features, size):
+    anchor = train[0]
+    scale = np.std(features[train], axis=0)
+    scale[scale == 0] = 1
+    others = train[train != anchor]
+    distance = np.linalg.norm((features[others] - features[anchor]) / scale, axis=1)
+    order = np.argsort(distance, kind="stable")
+    return np.concatenate(([anchor], others[order[:size - 1]]))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("dataset", type=Path)
@@ -27,11 +37,8 @@ def main():
     with threadpool_limits(limits=1):
         for seed in range(42, 52):
             train, _ = train_test_split(np.arange(len(x)), test_size=0.3, random_state=seed)
-            scale = np.std(x[train, :-1], axis=0)
-            scale[scale == 0] = 1
             anchor = train[0]
-            distance = np.linalg.norm((x[train, :-1] - x[anchor, :-1]) / scale, axis=1)
-            group = train[np.argsort(distance, kind="stable")[:10]]
+            group = anchor_group(train, x[:, :-1], size=10)
             for mode, removed in (("single", group[:1]), ("group", group)):
                 retain = train[~np.isin(train, removed)]
                 model = Ridge(alpha=ALPHA, fit_intercept=False, solver="svd").fit(x[retain], y[retain])
