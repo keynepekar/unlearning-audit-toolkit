@@ -41,4 +41,8 @@ The policy experiment adds concentrated and dispersed removal patterns and compa
 
 In the recorded full run, each method has 216 sequences. All 216 sequences in each Gram policy exceeded the coefficient or prediction tolerance at least once. Block QR exceeded it in 50 sequences. The condition rule rebuilt 11,551 times across its sequences. These deliberately high-leverage cases demonstrate a limitation of that threshold and of the normal-equation solve. They are not a general estimate of production reliability.
 
+![Tolerance failures across the four reconstruction policies](policy-results.svg)
+
+Generate the chart from the output with \`python examples/plot_policy_results.py policies/summary.csv policies/results.svg\`.
+
 The prediction controls construct equal squared losses with predictions on opposite sides of the target. Their AUC and paired loss gap are identical, while the mean prediction gap is one unit. A one-row change also shows how a 95th percentile can miss a rare deviation. These examples motivate inspecting both per-group and worst-case behavior.

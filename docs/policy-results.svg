@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 370" role="img" aria-labelledby="title desc">
+<title id="title">Sequences with at least one tolerance failure</title>
+<desc id="desc">In the high-leverage benchmark, all Gram-policy sequences and 50 of 216 block QR sequences exceeded the tolerance. The CSV contains per-sequence results.</desc>
+<rect width="820" height="370" rx="12" fill="#f7f9fb"/>
+<g font-family="system-ui, sans-serif" fill="#192339" font-size="14">
+<text x="30" y="32" font-size="21" font-weight="700">Sequences with at least one tolerance failure</text>
+<text x="30" y="58">High-leverage synthetic data · coefficient or prediction relative error above 10⁻⁶</text>
+<path d="M295 85V300" stroke="#d6dfe7"/><text x="295" y="324" text-anchor="middle">0%</text><path d="M400 85V300" stroke="#d6dfe7"/><text x="400" y="324" text-anchor="middle">25%</text><path d="M505 85V300" stroke="#d6dfe7"/><text x="505" y="324" text-anchor="middle">50%</text><path d="M610 85V300" stroke="#d6dfe7"/><text x="610" y="324" text-anchor="middle">75%</text><path d="M715 85V300" stroke="#d6dfe7"/><text x="715" y="324" text-anchor="middle">100%</text><text x="280" y="115" text-anchor="end">Continuous Gram subtraction</text><rect x="295" y="100" width="420.00" height="19" rx="3" fill="#006b60"/><text x="730" y="115">216/216</text><text x="280" y="165" text-anchor="end">Gram with periodic reconstruction</text><rect x="295" y="150" width="420.00" height="19" rx="3" fill="#006b60"/><text x="730" y="165">216/216</text><text x="280" y="215" text-anchor="end">Gram with condition trigger</text><rect x="295" y="200" width="420.00" height="19" rx="3" fill="#006b60"/><text x="730" y="215">216/216</text><text x="280" y="265" text-anchor="end">Cached block QR</text><rect x="295" y="250" width="97.22" height="19" rx="3" fill="#006b60"/><text x="730" y="265">50/216</text>
+<text x="505" y="352" text-anchor="middle">Share of sequences</text>
+</g></svg>
