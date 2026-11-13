@@ -55,7 +55,7 @@ The [ridge control experiment](docs/ridge-controls.md) compares an exact update 
 
 The [ridge benchmark](docs/ridge-benchmark.md) tests when the update agrees with an independent refit, where floating-point cancellation breaks that agreement, and how the runtime changes with deletion size.
 
-The [sequential experiment](docs/sequential-experiment.md) compares repeated updates with an SVD refit after each request, including a reproducible example on UCI Wine Quality.
+The [sequential experiments](docs/sequential-experiment.md) compare repeated updates with an SVD refit after each request. The guide includes the held-out alert evaluation, repeated cost and memory measurements, bootstrap coverage simulation, and the UCI Wine Quality examples.
 
 The reusable [scikit-learn export example](examples/sklearn_export.py) converts fitted probability classifiers and labeled cohorts to the toolkit's CSV format. The digits demo uses it.
 

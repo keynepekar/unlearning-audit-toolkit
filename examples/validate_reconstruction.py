@@ -57,7 +57,7 @@ def replay(case, threshold=None):
         condition = float(np.linalg.cond(stats.gram + penalty))
         reference = ridge_svd(x[keep], y[keep], alpha)
         before = errors(solve(stats, alpha), reference, holdout)
-        alert = threshold is not None and condition > threshold
+        alert = threshold is not None and (not np.isfinite(condition) or condition > threshold)
         after = before
         if alert:
             stats = RidgeStats.from_rows(x[keep], y[keep])
@@ -114,6 +114,8 @@ def main():
         "training_candidates": candidates, "selected": best["threshold"],
         "validation_counts": confusion(steps), "validation_steps": len(steps),
         "post_failures": sum(step["post_failure"] for step in steps),
+        "corrected_steps": sum(step["pre_failure"] and not step["post_failure"] for step in steps),
+        "new_failure_steps": sum(not step["pre_failure"] and step["post_failure"] for step in steps),
         "sequences": results,
     }
     with args.output.open("x", encoding="utf-8") as stream:
