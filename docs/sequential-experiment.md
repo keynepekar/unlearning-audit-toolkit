@@ -7,6 +7,7 @@ The experimental block QR implementation retains a local copy of the training ro
 ```sh
 python -m pip install . -r examples/requirements-demo.txt
 python examples/sequential_benchmark.py sequential-results
+python examples/summarize_sequences.py sequential-results/sequences.csv sequential-results/summary.csv
 ```
 
 The script writes a configuration with its SHA-256 and one CSV row per method and deletion step. The full profile crosses six seeds, 10 or 100 steps, three regularization strengths, three feature spectrum ratios and two leverage settings. Every sequence removes the first 100 rows and compares each step against a scikit-learn SVD refit on remaining rows. Requests arrive in fixed contiguous order. Timings include the update or refit for that step and exclude initial factorization and data generation. Use `--quick` for the CI profile.
