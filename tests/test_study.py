@@ -35,6 +35,13 @@ class StudyTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "duplicate training seed"):
             summarize_study([self.run_metrics(2), self.run_metrics(2)])
 
+    def test_chart_shows_a_signed_scale_with_units(self):
+        study = summarize_study([self.run_metrics(2), self.run_metrics(5)])
+        report = study_html(study)
+        self.assertIn("AUC difference (points). One point is 0.01 AUC.", report)
+        for tick in ("−100", "−50", "0", "+50", "+100"):
+            self.assertIn(f'text-anchor="middle">{tick}</text>', report)
+
     def test_rejects_mixed_protocols_and_splits(self):
         first = self.run_metrics(2)
         with self.assertRaisesRegex(ValueError, "protocol metadata"):

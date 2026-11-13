@@ -88,11 +88,26 @@ def study_csv(study: dict) -> str:
 def _range_chart(study: dict) -> str:
     summary = study["auc_delta_summary"]
     extent = max(0.01, max(abs(summary[key][bound]) for key in COMPARISONS for bound in ("min", "max")))
+    # Use round, symmetric ticks in AUC points, with room for both endpoints.
+    step = next(step for step in (0.5, 1, 2, 5, 10, 20, 50) if 2 * step >= extent * 100)
+    extent = 2 * step / 100
     left, right = 48, 552
     center = (left + right) / 2
+    axis_y = 145
 
     def x(value: float) -> float:
         return center + value / extent * (right - center)
+
+    ticks = []
+    for value in (-2 * step, -step, 0, step, 2 * step):
+        position = x(value / 100)
+        label = f"{value:+g}".replace("-", "−") if value else "0"
+        line_class = "chance" if value == 0 else "grid"
+        ticks.append(
+            f'<path class="{line_class}" d="M{position:.2f} 39V{axis_y}"/>'
+            f'<path class="study-axis" d="M{position:.2f} {axis_y}v6"/>'
+            f'<text x="{position:.2f}" y="169" text-anchor="middle">{label}</text>'
+        )
 
     rows = []
     for y, key in zip((45, 112), COMPARISONS):
@@ -103,15 +118,15 @@ def _range_chart(study: dict) -> str:
             f'<circle class="study-mean" cx="{x(group["mean"]):.2f}" cy="{y}" r="5"/>'
         )
     return (
-        '<svg viewBox="0 0 600 166" role="img" aria-labelledby="spread-title spread-desc">'
+        '<svg viewBox="0 0 600 177" role="img" aria-labelledby="spread-title spread-desc">'
         '<title id="spread-title">Observed ranges of paired AUC differences</title>'
         '<desc id="spread-desc">Horizontal lines span the minimum and maximum across runs. '
-        'Dots mark means. The summary table lists exact values.</desc>'
-        f'<path class="chance" d="M{center:g} 35V139"/>'
+        'Dots mark means. The horizontal axis is measured in AUC points. '
+        'The summary table gives the same values on the original AUC scale.</desc>'
+        f'<path class="study-axis" d="M{left} {axis_y}H{right}"/>'
+        + "".join(ticks)
         + "".join(rows)
-        + f'<text x="{left}" y="155" text-anchor="middle">−{extent:.3f}</text>'
-        + f'<text x="{center:g}" y="155" text-anchor="middle">0</text>'
-        + f'<text x="{right}" y="155" text-anchor="middle">+{extent:.3f}</text></svg>'
+        + '</svg>'
     )
 
 
@@ -133,7 +148,10 @@ def study_html(study: dict) -> str:
   <section class="panel">
     <h2>Observed spread in AUC differences</h2>
     <p>The line shows the observed range and the dot marks the mean. These are descriptive statistics across runs.</p>
-    <div class="study-chart">{_range_chart(study)}</div>
+    <figure class="study-chart">
+      {_range_chart(study)}
+      <figcaption>AUC difference (points). One point is 0.01 AUC.</figcaption>
+    </figure>
     <p class="table-hint">Scroll the tables sideways for more columns.</p>
     <div class="table-wrap" tabindex="0" role="region" aria-label="AUC difference summary">
       <table><thead><tr><th scope="col">Comparison</th><th scope="col">Mean</th><th scope="col">Sample SD</th><th scope="col">Min</th><th scope="col">Max</th></tr></thead>

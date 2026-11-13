@@ -50,6 +50,23 @@ The study reports individual run estimates, mean, sample standard deviation and 
 
 In the six-seed digits example, the observed candidate-minus-original AUC range is −0.0080 to −0.0028. The candidate-minus-retrained range is +0.0089 to +0.0165. These are small changes in a comparison where the original model's AUC is already close to chance-level ranking. [Example study report](digits-study.png)
 
+A longer run used the same evaluation split and training seeds 42 through 89. The first six seeds are included in the 48-run set.
+
+| Candidate AUC minus | Six seeds, observed range | 48 seeds, observed range | 48 seeds, mean |
+| --- | ---: | ---: | ---: |
+| Original | −0.0080 to −0.0028 | −0.0117 to −0.0009 | −0.0063 |
+| Retrained | +0.0089 to +0.0165 | +0.0073 to +0.0165 | +0.0122 |
+
+Both differences kept their sign across the 48 runs, while the observed range widened. This measures sensitivity to training seeds on one split. To reproduce the extended run from a POSIX shell after installing the demo dependencies:
+
+```sh
+mkdir seed-study
+for seed in $(seq 42 89); do
+    python examples/digits_demo.py "seed-study/seed-$seed" --training-seed "$seed" || exit 1
+done
+unlearning-audit study seed-study/seed-*/metrics.json --format html --output seed-study/study.html
+```
+
 ## Interpretation
 
 Look at the original model's separation first. When its AUC is already close to 0.5, the chosen loss score may have little power to show a change after unlearning. Results describe one score, one comparison protocol and the supplied model fits. They do not establish deletion, formal equivalence to retraining or legal compliance. Dependencies between observations can make sample-level intervals optimistic.

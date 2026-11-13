@@ -59,6 +59,8 @@ dl { display: grid; grid-template-columns: minmax(90px, 150px) minmax(0, 1fr); g
 dt { font-weight: 650; overflow-wrap: anywhere; }
 dd { margin: 0; line-height: 1.5; overflow-wrap: anywhere; }
 .study-chart { max-width: 700px; }
+.study-chart figcaption { color: var(--muted); font-size: .87rem; text-align: center; margin-bottom: 10px; }
+.study-axis { fill: none; stroke: #778497; }
 .study-range { stroke: var(--candidate); stroke-width: 4; stroke-linecap: round; }
 .study-mean { fill: var(--text); stroke: white; stroke-width: 1.5; }
 @media (max-width: 820px) { .grid-panels { grid-template-columns: 1fr; } }
