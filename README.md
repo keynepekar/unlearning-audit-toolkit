@@ -49,6 +49,10 @@ unlearning-audit study audit-demo/metrics.json audit-demo-43/metrics.json --form
 
 The [six-run example](docs/digits-study.png) shows the range and mean of each paired AUC difference, with a table of per-seed values.
 
+## When ROC AUC misses a change
+
+The [ridge control experiment](docs/ridge-controls.md) compares an exact update with an unchanged model. Both have the same ROC AUC on the synthetic benchmark. The paired loss gaps and the independently retrained model reveal the difference.
+
 See the [input contract and methodology](docs/methodology.md) for cohort definitions, metric interpretation, limitations and data attribution. Report files contain aggregate statistics. Keep per-example inputs in the audit environment.
 
 ## Development

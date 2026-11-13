@@ -39,3 +39,6 @@ jobs:
       - run: unlearning-audit verify demo/metrics.json demo/losses.csv --manifest demo/manifest.json
       - run: python examples/digits_demo.py demo-43 --training-seed 43
       - run: unlearning-audit study demo/metrics.json demo-43/metrics.json --format html --output study.html
+      - run: python examples/ridge_control.py ridge-demo
+      - run: unlearning-audit verify ridge-demo/exact/metrics.json ridge-demo/exact/losses.csv --manifest ridge-demo/exact/manifest.json
+      - run: python -c "import json; exact, unchanged = json.load(open('ridge-demo/controls.json'))['controls']; assert exact['max_coefficient_gap'] < 1e-12; assert exact['auc']['candidate'] == unchanged['auc']['candidate']; assert exact['candidate_loss_gaps']['holdout'] < 1e-12; assert unchanged['candidate_loss_gaps']['holdout'] > 1"

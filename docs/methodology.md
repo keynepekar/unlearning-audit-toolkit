@@ -24,6 +24,7 @@ The manifest is a JSON object with `schema_version` set to `1`. Give the experim
 - **Calibrated operating points.** When a calibration cohort is present, choose the largest observed calibration loss whose inclusive threshold stays within the cap. If no tied block fits, use the all-negative rule. Apply the selected threshold to the forget and holdout cohorts. The measured holdout FPR can exceed the calibration cap.
 - **Paired AUC differences.** The toolkit reports candidate minus original and candidate minus retrained. A stratified percentile bootstrap resamples each cohort with replacement and uses the same resampled indices for all three models. Its 95% interval describes variability across examples for these fixed models. Repeat training separately to study variation across model fits.
 - **Utility.** If provided, the utility cohort contributes a separate mean loss for each model. Its interpretation depends on the declared loss and on how the cohort was formed.
+- **Paired loss gaps.** With `compare --loss-gaps`, report the mean absolute difference between each model's loss and the reference loss on the same examples, separately by cohort. This keeps information about the magnitude of differences that ROC ranks discard. [Controlled ridge example](ridge-controls.md)
 
 Use `--fpr` once per requested target. Defaults are 0.01 and 0.10. The comparison defaults to 400 bootstrap repeats and seed 42. The output JSON retains counts, rates, curves and intervals. HTML and CSV consume that saved JSON independently of the original exports.
 
