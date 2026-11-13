@@ -3,7 +3,7 @@
 import argparse
 import json
 from html import escape
-from math import log10
+from math import ceil, floor, log10
 from pathlib import Path
 
 from unlearning_audit.output import write_artifact
@@ -17,11 +17,11 @@ def render_chart(results: dict) -> str:
     fractions = sorted({row["deletion_fraction"] for row in timings})
     left, right, top, bottom = 87, 765, 82, 345
     values = [row["refit_over_update"] for row in timings]
-    low = min(-1, int(log10(min(values))) - 1)
-    high = max(1, int(log10(max(values))) + 1)
+    low = min(-1, floor(log10(min(values))))
+    high = max(1, ceil(log10(max(values))))
 
     def x(fraction):
-        return left + fractions.index(fraction) * (right - left) / (len(fractions) - 1)
+        return left + fraction * (right - left)
 
     def y(value):
         return bottom - (log10(value) - low) * (bottom - top) / (high - low)
@@ -33,7 +33,9 @@ def render_chart(results: dict) -> str:
         grid.append(f'<path stroke="{line}" d="M{left} {y(value):.2f}H{right}"/>')
         grid.append(f'<text x="{left - 12}" y="{y(value) + 4:.2f}" text-anchor="end">{value:g}×</text>')
     for fraction in fractions:
-        grid.append(f'<text x="{x(fraction):.2f}" y="373" text-anchor="middle">{fraction:.0%}</text>')
+        position = x(fraction)
+        grid.append(f'<path stroke="#8594a4" d="M{position:.2f} {bottom}v6"/>')
+        grid.append(f'<text x="{position:.2f}" y="373" text-anchor="middle">{fraction:.0%}</text>')
 
     series = []
     for index, (dimension, color, pattern) in enumerate(zip(dimensions, COLORS, ("none", "10 5", "3 4"), strict=True)):
