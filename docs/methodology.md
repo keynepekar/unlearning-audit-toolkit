@@ -56,6 +56,8 @@ Look at the original model's separation first. When its AUC is already close to 
 
 ## Demo data and references
 
+The [implementation references](sources.md) map methods to their sources and code.
+
 - Alpaydin and Kaynak (1998), [Optical Recognition of Handwritten Digits](https://doi.org/10.24432/C50P49), UCI Machine Learning Repository, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The demo uses the subset bundled by scikit-learn, removes exact pixel duplicates, partitions it and scales pixel intensities. The dataset itself is supplied by scikit-learn.
 - Carlini et al. (2022), [Membership Inference Attacks From First Principles](https://arxiv.org/abs/2112.03570). Discusses why performance at low false-positive rates matters.
 - Triantafillou et al. (2024), [Are we making progress in unlearning?](https://arxiv.org/abs/2406.09073). Describes the first NeurIPS unlearning challenge and comparison with retrained models.

@@ -57,6 +57,8 @@ The [ridge benchmark](docs/ridge-benchmark.md) tests when the update agrees with
 
 See the [input contract and methodology](docs/methodology.md) for cohort definitions, metric interpretation, limitations and data attribution. Report files contain aggregate statistics. Keep per-example inputs in the audit environment.
 
+The [sources and implementation notes](docs/sources.md) link each major method to its reference, source file and local design choices.
+
 ## Development
 
 ```sh
