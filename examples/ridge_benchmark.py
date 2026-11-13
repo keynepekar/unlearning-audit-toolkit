@@ -39,6 +39,14 @@ def loss_auc(forget_loss, holdout_loss):
     return area_under_roc(roc_counts(tuple(forget_loss), tuple(holdout_loss)))
 
 
+def direct_gram_error(retained, reference, alpha):
+    try:
+        error = relative_l2(retained.solve(alpha), reference)
+    except np.linalg.LinAlgError:
+        return None
+    return error if np.isfinite(error) else None
+
+
 def evaluate(train_x, train_y, forget_x, forget_y, holdout_x, holdout_y, alpha):
     full = RidgeStats.from_rows(
         np.concatenate((train_x, forget_x)), np.concatenate((train_y, forget_y)),
@@ -58,6 +66,7 @@ def evaluate(train_x, train_y, forget_x, forget_y, holdout_x, holdout_y, alpha):
         "updated_system_condition": condition if np.isfinite(condition) else None,
         "retained_gram_relative_l2": relative_l2(updated.gram, retained.gram),
         "retained_cross_relative_l2": relative_l2(updated.cross, retained.cross),
+        "direct_gram_coefficient_relative_l2": direct_gram_error(retained, reference, alpha),
         "coefficient_relative_l2": None,
         "holdout_prediction_relative_l2": None,
         "holdout_paired_loss_gap": None,
