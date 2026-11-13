@@ -20,7 +20,8 @@ def verify_comparison(document: object, export: LossExport, manifest: Manifest) 
 
     targets = tuple(point["target_fpr"] for point in saved["models"]["before"]["operating_points"])
     replayed = compare_losses(
-        export, manifest, targets=targets, include_fingerprints=True, **saved["bootstrap"],
+        export, manifest, targets=targets, include_fingerprints=True,
+        include_loss_gaps="loss_gaps" in saved, **saved["bootstrap"],
     )
     if saved != replayed:
         raise ValueError("saved metrics differ from replayed metrics")

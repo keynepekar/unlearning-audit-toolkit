@@ -28,6 +28,7 @@ def main() -> int:
     compare.add_argument("--bootstrap", type=int, default=400, help="bootstrap repeats, or 0 to disable")
     compare.add_argument("--seed", type=int, default=42)
     compare.add_argument("--fingerprints", action="store_true", help="record normalized input fingerprints")
+    compare.add_argument("--loss-gaps", action="store_true", help="report mean absolute paired loss gaps to retraining")
     report = commands.add_parser("report", help="render aggregate metrics as HTML or summary CSV")
     report.add_argument("metrics_file", type=Path)
     report.add_argument("--output", type=Path, required=True)
@@ -64,6 +65,7 @@ def main() -> int:
             result = compare_losses(
                 export, manifest, targets=tuple(args.fpr or (0.01, 0.10)),
                 repeats=args.bootstrap, seed=args.seed, include_fingerprints=args.fingerprints,
+                include_loss_gaps=args.loss_gaps,
             )
             write_artifact(
                 args.output, _json(result),

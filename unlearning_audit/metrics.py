@@ -126,6 +126,7 @@ def compare_losses(
     repeats: int = 400,
     seed: int = 42,
     include_fingerprints: bool = False,
+    include_loss_gaps: bool = False,
 ) -> dict:
     """Return an aggregate, JSON-compatible audit of three aligned model exports."""
     manifest.check_alignment(set(export.losses), set(export.sample_ids))
@@ -190,4 +191,14 @@ def compare_losses(
     }
     if include_fingerprints:
         result["fingerprints"] = fingerprint_inputs(export, manifest)
+    if include_loss_gaps:
+        result["loss_gaps"] = {
+            role: {
+                cohort: mean(abs(a - b) for a, b in zip(
+                    vectors[role][cohort], vectors["reference"][cohort], strict=True,
+                ))
+                for cohort in counts
+            }
+            for role in ("before", "candidate")
+        }
     return result

@@ -90,6 +90,8 @@ def validate_metrics(value: object) -> tuple[dict, Manifest]:
     if isinstance(value, dict) and "fingerprints" in value:
         validate_fingerprints(value["fingerprints"])
         fields.add("fingerprints")
+    if isinstance(value, dict) and "loss_gaps" in value:
+        fields.add("loss_gaps")
     result = _mapping(value, fields, "metrics")
     if type(result["schema_version"]) is not int or result["schema_version"] != 1:
         raise ValueError("unsupported metrics schema_version (expected 1)")
@@ -97,6 +99,12 @@ def validate_metrics(value: object) -> tuple[dict, Manifest]:
     counts = _mapping(result["counts"], set(manifest.cohorts), "cohort counts")
     for cohort, size in counts.items():
         _count(size, 1, 2**53 - 1, f"{cohort} count")
+    if "loss_gaps" in result:
+        gaps = _mapping(result["loss_gaps"], {"before", "candidate"}, "loss gaps")
+        for values in gaps.values():
+            _mapping(values, set(counts), "loss gap cohorts")
+            for gap in values.values():
+                _number(gap, 0, float_info.max, "mean absolute loss gap")
     models = _mapping(result["models"], set(ROLES), "models")
     targets = None
     model_fields = {"auc", "roc", "operating_points", "mean_utility_loss"}
@@ -267,6 +275,24 @@ def _definitions(values: dict[str, str]) -> str:
     return "".join(f"<dt>{escape(key)}</dt><dd>{escape(text)}</dd>" for key, text in values.items())
 
 
+def _loss_gaps(result: dict) -> str:
+    if "loss_gaps" not in result:
+        return ""
+    gaps = result["loss_gaps"]
+    rows = "".join(
+        f'<tr><th scope="row">{cohort.capitalize()}</th>'
+        f'<td>{gaps["before"][cohort]:.5g}</td><td>{gaps["candidate"][cohort]:.5g}</td></tr>'
+        for cohort in sorted(result["counts"])
+    )
+    return (
+        '<section class="panel"><h2>Paired loss gaps to retraining</h2>'
+        '<p>Mean absolute difference in loss on the same examples. Values are in units of the declared loss.</p>'
+        '<div class="table-wrap" tabindex="0" role="region" aria-label="Paired loss gaps">'
+        '<table><thead><tr><th scope="col">Cohort</th><th scope="col">Original</th>'
+        '<th scope="col">Candidate</th></tr></thead><tbody>' + rows + '</tbody></table></div></section>'
+    )
+
+
 def render_document(title: str, content: str) -> str:
     """Wrap rendered report content in the shared offline document shell."""
     css = files(__package__).joinpath("report.css").read_text(encoding="utf-8")
@@ -336,6 +362,7 @@ def render_report(document: object) -> str:
   </section>
   {_calibration(result)}
   {_utility(result)}
+  {_loss_gaps(result)}
   <section class="panel">
     <h2>Experiment provenance</h2>
     <p>{escape(manifest.loss_definition)}</p>

@@ -48,3 +48,13 @@ class VerificationTests(unittest.TestCase):
         del self.metrics["fingerprints"]
         with self.assertRaisesRegex(ValueError, "no fingerprints"):
             verify_comparison(self.metrics, self.export, self.manifest)
+
+    def test_replay_checks_paired_loss_gaps(self):
+        result = compare_losses(
+            self.export, self.manifest, include_fingerprints=True, include_loss_gaps=True, repeats=0,
+        )
+        self.assertAlmostEqual(result["loss_gaps"]["candidate"]["holdout"], 0.1)
+        verify_comparison(result, self.export, self.manifest)
+        result["loss_gaps"]["candidate"]["holdout"] = 0.0
+        with self.assertRaisesRegex(ValueError, "replayed metrics"):
+            verify_comparison(result, self.export, self.manifest)
