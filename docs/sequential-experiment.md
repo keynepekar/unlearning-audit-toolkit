@@ -28,4 +28,17 @@ For the initial random-selection run, the largest relative holdout prediction er
 
 ## Scope
 
-The CSV includes per-step timings and memory for stored inputs and factors. It does not measure peak process memory. The example does not automatically choose a reconstruction policy. The equal-squared-loss regression control in the test suite demonstrates that identical losses can mask different predictions.
+The CSV includes per-step timings and memory for stored inputs and factors. It does not measure peak process memory. The equal-squared-loss regression control in the test suite demonstrates that identical losses can mask different predictions.
+
+## Reconstruction policy experiment
+
+```sh
+python examples/reconstruction_policies.py policies
+python examples/prediction_controls.py
+```
+
+The policy experiment adds concentrated and dispersed removal patterns and compares continuous subtraction, reconstruction every ten requests, reconstruction when the updated Gram matrix condition number exceeds 10¹⁰, and cached block QR. It records each request and a summary with total, median and 95th percentile update times. Initial setup is excluded. The fixed threshold is exploratory and has not been calibrated on held-out sequences. QR block factors retain access to the original rows.
+
+In the recorded full run, each method has 216 sequences. All 216 sequences in each Gram policy exceeded the coefficient or prediction tolerance at least once. Block QR exceeded it in 50 sequences. The condition rule rebuilt 11,551 times across its sequences. These deliberately high-leverage cases demonstrate a limitation of that threshold and of the normal-equation solve. They are not a general estimate of production reliability.
+
+The prediction controls construct equal squared losses with predictions on opposite sides of the target. Their AUC and paired loss gap are identical, while the mean prediction gap is one unit. A one-row change also shows how a 95th percentile can miss a rare deviation. These examples motivate inspecting both per-group and worst-case behavior.

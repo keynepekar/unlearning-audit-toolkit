@@ -48,3 +48,5 @@ jobs:
       - run: python -c "import json; r = json.load(open('ridge-benchmark/benchmark.json')); assert len(r['stress']) == 108; assert len(r['digits']) == 24; assert len(r['timing']) == 12; assert any(c['status'] == 'outside_tolerance' for c in r['stress']); assert all(c['status'] == 'within_tolerance' for c in r['digits'])"
       - run: python examples/sequential_benchmark.py sequential --quick
       - run: python examples/summarize_sequences.py sequential/sequences.csv sequential/summary.csv
+      - run: python examples/reconstruction_policies.py policies --quick
+      - run: python examples/prediction_controls.py
