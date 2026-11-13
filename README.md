@@ -55,6 +55,8 @@ The [ridge control experiment](docs/ridge-controls.md) compares an exact update 
 
 The [ridge benchmark](docs/ridge-benchmark.md) tests when the update agrees with an independent refit, where floating-point cancellation breaks that agreement, and how the runtime changes with deletion size.
 
+The [sequential experiment](docs/sequential-experiment.md) compares repeated updates with an SVD refit after each request, including a reproducible example on UCI Wine Quality.
+
 See the [input contract and methodology](docs/methodology.md) for cohort definitions, metric interpretation, limitations and data attribution. Report files contain aggregate statistics. Keep per-example inputs in the audit environment.
 
 The [sources and implementation notes](docs/sources.md) link each major method to its reference, source file and local design choices.

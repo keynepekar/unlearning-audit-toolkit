@@ -10,7 +10,7 @@ except ImportError:
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "examples"))
 if np is not None:
-    from block_ridge import block_refit
+    from block_ridge import BlockRidge, block_refit
 
 
 @unittest.skipIf(np is None, "demo dependencies are not installed")
@@ -38,3 +38,30 @@ class BlockRidgeTests(unittest.TestCase):
         for removed in ([0, 0], [-1], [2], [0.5]):
             with self.subTest(removed=removed), self.assertRaises(ValueError):
                 block_refit(x, y, removed, alpha=1, block_size=1)
+
+    def test_sequential_removals_are_atomic_and_match_refit(self):
+        rng = np.random.default_rng(24)
+        x, y = rng.normal(size=(30, 4)), rng.normal(size=30)
+        model = BlockRidge(x, y, alpha=0.1, block_size=7)
+        for group in ([1, 9], [2, 14], [7, 8]):
+            weights, _ = model.remove(group)
+            expected = Ridge(alpha=0.1, fit_intercept=False, solver="svd").fit(x[model.keep], y[model.keep]).coef_
+            np.testing.assert_allclose(weights, expected, atol=1e-11, rtol=1e-11)
+        before = model.keep.copy()
+        with self.assertRaises(ValueError):
+            model.remove([1, 5])
+        np.testing.assert_array_equal(model.keep, before)
+
+    def test_order_and_complete_removal(self):
+        rng = np.random.default_rng(6)
+        x, y = rng.normal(size=(12, 3)), rng.normal(size=12)
+        first = BlockRidge(x, y, alpha=1, block_size=4)
+        second = BlockRidge(x, y, alpha=1, block_size=4)
+        first.remove([0, 1])
+        a, _ = first.remove([5, 6])
+        second.remove([5, 6])
+        b, _ = second.remove([0, 1])
+        np.testing.assert_allclose(a, b, atol=1e-12)
+        result, details = first.remove(np.flatnonzero(first.keep))
+        np.testing.assert_allclose(result, np.zeros(3), atol=1e-12)
+        self.assertEqual(details["active_rows"], 0)
