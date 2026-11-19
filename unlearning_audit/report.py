@@ -1,6 +1,7 @@
 """Render a saved audit as a self-contained, offline HTML report."""
 
 import json
+import re
 from csv import writer
 from html import escape
 from importlib.resources import files
@@ -101,6 +102,8 @@ def validate_metrics(value: object) -> tuple[dict, Manifest]:
         fields.add("fingerprints")
     if isinstance(value, dict) and "loss_gaps" in value:
         fields.add("loss_gaps")
+    if isinstance(value, dict) and "grouping" in value:
+        fields.add("grouping")
     result = _mapping(value, fields, "metrics")
     if type(result["schema_version"]) is not int or result["schema_version"] != 1:
         raise ValueError("unsupported metrics schema_version (expected 1)")
@@ -108,6 +111,16 @@ def validate_metrics(value: object) -> tuple[dict, Manifest]:
     counts = _mapping(result["counts"], set(manifest.cohorts), "cohort counts")
     for cohort, size in counts.items():
         _count(size, 1, 2**53 - 1, f"{cohort} count")
+    if "grouping" in result:
+        group_fields = {"counts", "groups_sha256"} if "fingerprints" in result else {"counts"}
+        grouping = _mapping(result["grouping"], group_fields, "grouping")
+        group_counts = _mapping(grouping["counts"], {"forget", "holdout"}, "group counts")
+        for cohort, size in group_counts.items():
+            _count(size, 2, counts[cohort], f"{cohort} group count")
+        if "groups_sha256" in group_fields:
+            digest = grouping["groups_sha256"]
+            if not isinstance(digest, str) or not re.fullmatch(r"[a-f0-9]{64}", digest):
+                raise ValueError("invalid groups_sha256")
     if "loss_gaps" in result:
         gaps = _mapping(result["loss_gaps"], {"before", "candidate"}, "loss gaps")
         for values in gaps.values():
@@ -160,6 +173,10 @@ def validate_metrics(value: object) -> tuple[dict, Manifest]:
             _number(interval[1], lower, 1, "upper AUC interval")
     bootstrap = _mapping(result["bootstrap"], {"repeats", "seed"}, "bootstrap")
     _count(bootstrap["repeats"], 0, 10_000, "bootstrap repeats")
+    if "grouping" in result and (
+        bootstrap["repeats"] < 200 or any(delta["interval"] is None for delta in deltas.values())
+    ):
+        raise ValueError("grouped comparisons require bootstrap intervals")
     if type(bootstrap["seed"]) is not int:
         raise ValueError("invalid bootstrap seed")
     if not isinstance(result["warnings"], list) or any(not isinstance(item, str) for item in result["warnings"]):
@@ -334,6 +351,13 @@ def render_report(document: object) -> str:
         if warning_items else ""
     )
     bootstrap = result["bootstrap"]
+    sampling = "Paired bootstrap over the same examples within each cohort."
+    if "grouping" in result:
+        groups = result["grouping"]["counts"]
+        sampling = (
+            f"Paired bootstrap of whole groups. "
+            f"{groups['forget']:,} forget groups and {groups['holdout']:,} holdout groups."
+        )
     return render_document(manifest.title, f"""  <header class="hero">
     <p class="project">Unlearning Audit Toolkit</p>
     <h1>{title}</h1>
@@ -359,7 +383,7 @@ def render_report(document: object) -> str:
       <h2>Change in AUC</h2>
       <p>Differences use the candidate minus each comparator.</p>
       {_differences(result)}
-      <p>Paired bootstrap over the same examples within each cohort. Repeats: {bootstrap['repeats']:,}. Seed: {bootstrap['seed']}.</p>
+      <p>{sampling} Repeats: {bootstrap['repeats']:,}. Seed: {bootstrap['seed']}.</p>
       <p>Intervals describe sampling variation for these fitted models. AUC near 0.5 shows weak ranking for this score alone.</p>
     </section>
   </div>

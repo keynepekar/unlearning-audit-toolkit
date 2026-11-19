@@ -5,6 +5,7 @@ import csv
 import json
 from pathlib import Path
 
+from .groups import load_groups
 from .manifest import load_manifest
 from .metrics import compare_losses
 from .output import write_artifact
@@ -29,6 +30,7 @@ def main() -> int:
     compare.add_argument("--seed", type=int, default=42)
     compare.add_argument("--fingerprints", action="store_true", help="record normalized input fingerprints")
     compare.add_argument("--loss-gaps", action="store_true", help="report mean absolute paired loss gaps to retraining")
+    compare.add_argument("--groups", type=Path, help="sample_id,group_id CSV for grouped AUC intervals")
     report = commands.add_parser("report", help="render aggregate metrics as HTML or summary CSV")
     report.add_argument("metrics_file", type=Path)
     report.add_argument("--output", type=Path, required=True)
@@ -37,6 +39,7 @@ def main() -> int:
     verify.add_argument("metrics_file", type=Path)
     verify.add_argument("csv_file", type=Path)
     verify.add_argument("--manifest", type=Path, required=True)
+    verify.add_argument("--groups", type=Path, help="group assignments used in the saved comparison")
     study = commands.add_parser("study", help="summarize training repeats on a fixed split")
     study.add_argument("metrics_files", type=Path, nargs="+")
     study.add_argument("--output", type=Path, required=True)
@@ -58,7 +61,8 @@ def main() -> int:
         export = load_losses(args.csv_file)
         manifest = load_manifest(args.manifest) if args.manifest else None
         if args.command == "verify":
-            verify_comparison(load_metrics(args.metrics_file), export, manifest)
+            groups = load_groups(args.groups) if args.groups is not None else None
+            verify_comparison(load_metrics(args.metrics_file), export, manifest, group_assignments=groups)
             print("Input fingerprints and replayed metrics match.")
             return 0
         if args.command == "compare":
@@ -66,10 +70,11 @@ def main() -> int:
                 export, manifest, targets=tuple(args.fpr or (0.01, 0.10)),
                 repeats=args.bootstrap, seed=args.seed, include_fingerprints=args.fingerprints,
                 include_loss_gaps=args.loss_gaps,
+                group_assignments=load_groups(args.groups) if args.groups is not None else None,
             )
             write_artifact(
                 args.output, _json(result),
-                inputs=(args.csv_file, args.manifest),
+                inputs=tuple(path for path in (args.csv_file, args.manifest, args.groups) if path is not None),
             )
             print(f"Wrote metrics to {args.output}")
             return 0

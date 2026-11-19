@@ -37,6 +37,7 @@ def summarize_study(documents: Iterable[object]) -> dict:
 
         contract = {
             "split": result["fingerprints"]["split_sha256"],
+            "grouping": result.get("grouping"),
             "cohort counts": result["counts"],
             "cohort descriptions": manifest.cohorts,
             "loss definition": manifest.loss_definition,

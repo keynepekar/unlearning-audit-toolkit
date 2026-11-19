@@ -8,6 +8,7 @@ from statistics import mean
 
 from .calibration import calibrated_points
 from .fingerprints import fingerprint_inputs
+from .groups import GroupIndices, align_groups, group_digest
 from .manifest import ROLES, Manifest
 from .validation import LossExport
 
@@ -93,7 +94,8 @@ def _resampled_auc(ranks: tuple[list[int], list[int], int], forget_idx: list[int
 
 
 def paired_auc_intervals(
-    vectors: dict[str, dict[str, tuple[float, ...]]], repeats: int, seed: int
+    vectors: dict[str, dict[str, tuple[float, ...]]], repeats: int, seed: int,
+    groups: GroupIndices | None = None,
 ) -> dict[str, list[float] | None]:
     """Resample within each cohort using the same indices for all model roles."""
     comparisons = ("candidate_minus_before", "candidate_minus_reference")
@@ -106,8 +108,14 @@ def paired_auc_intervals(
     differences: dict[str, list[float]] = {name: [] for name in comparisons}
     ranks = {role: _loss_ranks(values["forget"], values["holdout"]) for role, values in vectors.items()}
     for _ in range(repeats):
-        forget_idx = rng.choices(range(forget_n), k=forget_n)
-        holdout_idx = rng.choices(range(holdout_n), k=holdout_n)
+        if groups is None:
+            forget_idx = rng.choices(range(forget_n), k=forget_n)
+            holdout_idx = rng.choices(range(holdout_n), k=holdout_n)
+        else:
+            forget_idx, holdout_idx = (
+                [index for group in rng.choices(groups[cohort], k=len(groups[cohort])) for index in group]
+                for cohort in ("forget", "holdout")
+            )
         areas = {role: _resampled_auc(role_ranks, forget_idx, holdout_idx) for role, role_ranks in ranks.items()}
         differences["candidate_minus_before"].append(areas["candidate"] - areas["before"])
         differences["candidate_minus_reference"].append(areas["candidate"] - areas["reference"])
@@ -127,6 +135,7 @@ def compare_losses(
     seed: int = 42,
     include_fingerprints: bool = False,
     include_loss_gaps: bool = False,
+    group_assignments: dict[str, str] | None = None,
 ) -> dict:
     """Return an aggregate, JSON-compatible audit of three aligned model exports."""
     manifest.check_alignment(set(export.losses), set(export.sample_ids))
@@ -138,6 +147,9 @@ def compare_losses(
         raise ValueError("bootstrap repeats must be 0 or between 200 and 10000")
     if type(seed) is not int:
         raise ValueError("bootstrap seed must be an integer")
+    if group_assignments is not None and not repeats:
+        raise ValueError("group bootstrap requires nonzero repeats")
+    groups = align_groups(export, group_assignments) if group_assignments is not None else None
 
     counts = export.counts
     targets = tuple(sorted(targets))
@@ -156,7 +168,7 @@ def compare_losses(
                 values["forget"], values["holdout"], values["calibration"], targets
             )
 
-    intervals = paired_auc_intervals(vectors, repeats, seed)
+    intervals = paired_auc_intervals(vectors, repeats, seed, groups)
     deltas = {
         f"candidate_minus_{role}": {
             "estimate": models["candidate"]["auc"] - models[role]["auc"],
@@ -179,6 +191,8 @@ def compare_losses(
         warnings.append("Bootstrap intervals require at least two examples per audit cohort.")
     if not repeats:
         warnings.append("Bootstrap intervals were disabled for this run.")
+    if groups is not None and min(map(len, groups.values())) < 20:
+        warnings.append("At least one audit cohort has fewer than 20 groups. Interval coverage can be unstable.")
 
     result = {
         "schema_version": 1,
@@ -191,6 +205,10 @@ def compare_losses(
     }
     if include_fingerprints:
         result["fingerprints"] = fingerprint_inputs(export, manifest)
+    if groups is not None:
+        result["grouping"] = {"counts": {cohort: len(units) for cohort, units in groups.items()}}
+        if include_fingerprints:
+            result["grouping"]["groups_sha256"] = group_digest(export, groups)
     if include_loss_gaps:
         result["loss_gaps"] = {
             role: {

@@ -28,7 +28,21 @@ The manifest is a JSON object with `schema_version` set to `1`. Give the experim
 
 Use `--fpr` once per requested target. Defaults are 0.01 and 0.10. The comparison defaults to 400 bootstrap repeats and seed 42. The output JSON retains counts, rates, curves and intervals. HTML and CSV consume that saved JSON independently of the original exports.
 
-For repeated measurements from the same person, document or other sampling unit, the row bootstrap can produce overly narrow intervals. Use `compare --bootstrap 0` to omit those intervals when observations are grouped. See the [clustered ROC references](sources.md#related-evaluation-protocols) for alternatives.
+## Grouped observations
+
+For repeated measurements from the same person, document or other independent sampling unit, use `compare --groups groups.csv`. The UTF-8 file has a `sample_id,group_id` header and exactly one assignment for every forget and holdout sample. Include at least two groups per cohort. Group IDs must be distinct across the two cohorts. The command rejects an assignment that spans cohorts because independent resampling of the two cohorts would break that dependence. Group IDs and sample IDs are case-sensitive and trimmed.
+
+This option changes the two paired AUC intervals. The bootstrap resamples whole groups within each cohort and uses the same draws for all three models. With unequal group sizes, each draw recalculates the AUC denominator using the total number of sampled rows. The estimand is the probability of outranking across rows, so larger groups contribute more observations to the point estimate. Interpret intervals under independent sampling of groups and consider their size and number. The report warns when either cohort has fewer than 20 groups. That threshold is a diagnostic, and nominal coverage depends on the sampling design. The procedure conditions on the fitted models.
+
+```sh
+unlearning-audit compare examples/comparison.csv --manifest examples/manifest.json --groups examples/groups.csv --fingerprints --output grouped.json
+unlearning-audit verify grouped.json examples/comparison.csv --manifest examples/manifest.json --groups examples/groups.csv
+unlearning-audit report grouped.json --output grouped.html
+```
+
+The example uses singleton groups to illustrate the file format. Grouped audits add a `grouping` object with per-cohort counts and, with `--fingerprints`, a `groups_sha256` digest. Assignment order and group names can change during replay if the partition of sample IDs stays the same. `study` requires the same partition in every run. The loss CSV and manifest formats are unchanged. Version 0.6 accepts earlier results, and grouped results require version 0.6 or later.
+
+When group membership is unavailable, `compare --bootstrap 0` omits the intervals. [Coverage simulation and sources](cluster-auc.md)
 
 Use `report --format roc-csv` to export every plotted ROC point with its false-positive and true-positive counts. The HTML report provides text and tables alongside the chart. Its chart lines differ by both color and stroke pattern.
 
