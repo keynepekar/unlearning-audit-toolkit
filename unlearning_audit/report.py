@@ -55,7 +55,8 @@ def _check_curve(points: object, holdout: int, forget: int) -> None:
 
 
 def _check_operating_points(
-    rows: object, holdout: int, forget: int, *, calibration: int | None = None
+    rows: object, holdout: int, forget: int, *, calibration: int | None = None,
+    roc: frozenset[RocPoint] = frozenset(),
 ) -> tuple[float, ...]:
     if not isinstance(rows, list) or not rows:
         raise ValueError("missing operating points")
@@ -63,6 +64,7 @@ def _check_operating_points(
     fields = {"target_fpr", "fpr", "tpr", "false_positives", "true_positives"}
     if calibration is not None:
         fields.add("calibration_false_positives")
+    previous_calibrated = previous_fp = previous_tp = 0
     for row in rows:
         _mapping(row, fields, "operating point")
         target = _number(row["target_fpr"], 0, 1, "target FPR")
@@ -75,6 +77,13 @@ def _check_operating_points(
             calibrated_fp = _count(row["calibration_false_positives"], 0, calibration, "calibration count")
             if calibrated_fp / calibration > target:
                 raise ValueError("calibration count exceeds its FPR target")
+            if RocPoint(fp, tp) not in roc:
+                raise ValueError("calibrated operating point does not lie on the ROC curve")
+            if calibrated_fp < previous_calibrated or fp < previous_fp or tp < previous_tp:
+                raise ValueError("calibrated operating point counts must be nondecreasing")
+            if calibrated_fp == previous_calibrated and (fp, tp) != (previous_fp, previous_tp):
+                raise ValueError("calibrated operating points with equal calibration counts must agree")
+            previous_calibrated, previous_fp, previous_tp = calibrated_fp, fp, tp
             maximum = 1
         fpr = _number(row["fpr"], 0, maximum, "observed FPR")
         tpr = _number(row["tpr"], 0, 1, "observed TPR")
@@ -126,7 +135,7 @@ def validate_metrics(value: object) -> tuple[dict, Manifest]:
         if "calibration" in counts:
             calibrated = _check_operating_points(
                 metrics["calibrated_points"], counts["holdout"], counts["forget"],
-                calibration=counts["calibration"],
+                calibration=counts["calibration"], roc=frozenset(roc),
             )
             if calibrated != targets:
                 raise ValueError("calibrated and descriptive FPR targets must match")

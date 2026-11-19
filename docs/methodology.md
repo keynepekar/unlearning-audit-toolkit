@@ -28,6 +28,8 @@ The manifest is a JSON object with `schema_version` set to `1`. Give the experim
 
 Use `--fpr` once per requested target. Defaults are 0.01 and 0.10. The comparison defaults to 400 bootstrap repeats and seed 42. The output JSON retains counts, rates, curves and intervals. HTML and CSV consume that saved JSON independently of the original exports.
 
+For repeated measurements from the same person, document or other sampling unit, the row bootstrap can produce overly narrow intervals. Use `compare --bootstrap 0` to omit those intervals when observations are grouped. See the [clustered ROC references](sources.md#related-evaluation-protocols) for alternatives.
+
 Use `report --format roc-csv` to export every plotted ROC point with its false-positive and true-positive counts. The HTML report provides text and tables alongside the chart. Its chart lines differ by both color and stroke pattern.
 
 ## Verify a saved audit
