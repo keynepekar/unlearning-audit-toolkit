@@ -23,18 +23,18 @@ Open `report.html` in a browser. For downstream analysis, run `unlearning-audit 
 | Command | Input | Result |
 | --- | --- | --- |
 | `validate` | CSV and optional manifest | Cohort counts or a validation error |
-| `compare` | CSV and manifest | JSON with ROC curves, operating points, paired AUC differences and optional utility loss |
+| `compare` | CSV, manifest and optional group assignments | JSON with ROC curves, operating points, paired AUC differences and optional utility loss |
 | `report` | Saved metrics JSON | Offline HTML, an operating-point summary, or the full ROC data as CSV |
-| `verify` | Fingerprinted metrics, CSV and manifest | Check that the inputs and replayed metrics match |
+| `verify` | Fingerprinted metrics and the original audit inputs | Check that the inputs and replayed metrics match |
 | `study` | Fingerprinted metrics from repeated training runs | Compare AUC differences across seeds on one fixed split |
 
 ### Install the release wheel
 
-Download the `.whl` file from the [v0.5.1 release](https://github.com/keynepekar/unlearning-audit-toolkit/releases/tag/v0.5.1). From its download directory, use the GitHub CLI to verify the wheel's build provenance before installing:
+Download the `.whl` file from the [v0.6.0 release](https://github.com/keynepekar/unlearning-audit-toolkit/releases/tag/v0.6.0). From its download directory, use the GitHub CLI to verify the wheel's build provenance before installing:
 
 ```sh
-gh attestation verify unlearning_audit_toolkit-0.5.1-py3-none-any.whl --repo keynepekar/unlearning-audit-toolkit --source-ref refs/tags/v0.5.1
-python -m pip install --no-index --no-deps unlearning_audit_toolkit-0.5.1-py3-none-any.whl
+gh attestation verify unlearning_audit_toolkit-0.6.0-py3-none-any.whl --repo keynepekar/unlearning-audit-toolkit --source-ref refs/tags/v0.6.0
+python -m pip install --no-index --no-deps unlearning_audit_toolkit-0.6.0-py3-none-any.whl
 ```
 
 ## Reproduce the screenshot
@@ -58,6 +58,12 @@ unlearning-audit study audit-demo/metrics.json audit-demo-43/metrics.json --form
 
 The [six-run example](docs/digits-study.png) shows the range and mean of each paired AUC difference, with a table of per-seed values.
 
+The [scoring replay](docs/scoring-provenance.md) reproduces the Digits loss CSV from recorded classifier coefficients and the scoring inputs.
+
+## Repeated measurements
+
+Use [grouped AUC intervals](docs/methodology.md#grouped-observations) when several forget or holdout rows come from the same independent sampling unit. A [coverage simulation](docs/cluster-auc.md) compares resampling rows and whole groups.
+
 ## When ROC AUC misses a change
 
 The [ridge control experiment](docs/ridge-controls.md) compares an exact update with an unchanged model. Both have the same ROC AUC on the synthetic benchmark. The paired loss gaps and the independently retrained model reveal the difference.
@@ -67,6 +73,8 @@ The [holdout sensitivity experiment](docs/holdout-sensitivity.md) keeps the mode
 The [ridge benchmark](docs/ridge-benchmark.md) tests when the update agrees with an independent refit, where floating-point cancellation breaks that agreement, and how the runtime changes with deletion size.
 
 The [sequential experiments](docs/sequential-experiment.md) compare repeated updates with an SVD refit after each request. The guide includes the held-out alert evaluation, repeated cost and memory measurements, bootstrap coverage simulation, and the UCI Wine Quality examples.
+
+The [Wine locality experiment](docs/wine-locality.md) measures where prediction discrepancies occur after the same deletion.
 
 The reusable [scikit-learn export example](examples/sklearn_export.py) converts fitted probability classifiers and labeled cohorts to the toolkit's CSV format. The digits demo uses it.
 

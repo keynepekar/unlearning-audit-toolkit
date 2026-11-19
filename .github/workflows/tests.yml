@@ -32,12 +32,16 @@ jobs:
           python-version: "3.14"
       - run: python -m pip install . -r examples/requirements-demo.txt
       - run: python -m unittest discover -s tests -v
-      - run: python examples/digits_demo.py demo
+      - run: python examples/digits_demo.py demo --record-scoring
+      - run: python examples/digits_demo.py demo --verify-scoring
       - run: unlearning-audit validate demo/losses.csv --manifest demo/manifest.json
       - run: unlearning-audit report demo/metrics.json --output demo/report.html
       - run: unlearning-audit report demo/metrics.json --format csv --output demo/summary.csv
       - run: unlearning-audit report demo/metrics.json --format roc-csv --output demo/roc.csv
       - run: unlearning-audit verify demo/metrics.json demo/losses.csv --manifest demo/manifest.json
+      - run: unlearning-audit compare examples/comparison.csv --manifest examples/manifest.json --groups examples/groups.csv --fingerprints --output grouped.json
+      - run: unlearning-audit verify grouped.json examples/comparison.csv --manifest examples/manifest.json --groups examples/groups.csv
+      - run: unlearning-audit report grouped.json --output grouped.html
       - run: python examples/digits_demo.py demo-43 --training-seed 43
       - run: unlearning-audit study demo/metrics.json demo-43/metrics.json --format html --output study.html
       - run: python examples/ridge_control.py ridge-demo
@@ -77,4 +81,5 @@ jobs:
       - run: python examples/plot_policy_results.py policies/summary.csv policies/chart.svg
       - run: python examples/validate_reconstruction.py reconstruction.json --quick
       - run: python examples/bootstrap_coverage.py coverage.json --quick
+      - run: python examples/cluster_auc_coverage.py cluster-auc-coverage.json --quick
       - run: python examples/repeated_costs.py repeated-costs.json --quick
