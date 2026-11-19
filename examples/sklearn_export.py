@@ -7,6 +7,8 @@ import numpy as np
 
 from unlearning_audit.validation import COHORTS, REQUIRED_COHORTS
 
+PROBABILITY_FLOOR = 1e-15
+
 
 def export_losses(path: Path, models: dict, cohorts: dict):
     """Write aligned cross-entropy losses from fitted probability classifiers.
@@ -52,7 +54,7 @@ def export_losses(path: Path, models: dict, cohorts: dict):
                 columns = [lookup[label] for label in y]
             except KeyError as error:
                 raise ValueError("target class is absent from a model") from error
-            loss = -np.log(np.maximum(probabilities[np.arange(len(y)), columns], 1e-15))
+            loss = -np.log(np.maximum(probabilities[np.arange(len(y)), columns], PROBABILITY_FLOOR))
             output.extend((sample, cohort, model_name, value) for sample, value in zip(ids, loss, strict=True))
     with path.open("x", encoding="utf-8", newline="") as stream:
         writer = csv.writer(stream, lineterminator="\n")

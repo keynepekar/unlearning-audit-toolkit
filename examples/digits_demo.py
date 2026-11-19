@@ -14,6 +14,7 @@ from sklearn.linear_model import SGDClassifier
 from sklearn.model_selection import train_test_split
 from threadpoolctl import threadpool_limits
 from sklearn_export import export_losses as export_classification_losses
+from digits_scoring import record_scoring, verify_scoring
 
 from unlearning_audit.manifest import load_manifest
 from unlearning_audit.metrics import compare_losses
@@ -70,7 +71,7 @@ def export_losses(path, models, images, labels, groups):
     export_classification_losses(path, models, cohorts)
 
 
-def run(output: Path, *, unchanged: bool, training_seed: int = SEED) -> None:
+def run(output: Path, *, unchanged: bool, training_seed: int = SEED, record: bool = False) -> None:
     output.mkdir(parents=True, exist_ok=False)
     pixels, labels = load_digits(return_X_y=True)
     groups = split_examples(pixels, labels)
@@ -81,11 +82,8 @@ def run(output: Path, *, unchanged: bool, training_seed: int = SEED) -> None:
         if not unchanged:
             update(candidate, images, labels, groups["retain"], UPDATE_EPOCHS, training_seed)
         reference = train(images, labels, groups["retain"], training_seed)
-        export_losses(
-            output / "losses.csv",
-            {"original": original, "candidate": candidate, "retrained": reference},
-            images, labels, groups,
-        )
+        models = {"original": original, "candidate": candidate, "retrained": reference}
+        export_losses(output / "losses.csv", models, images, labels, groups)
 
     candidate_method = (
         "Unchanged copy of the original classifier."
@@ -98,7 +96,7 @@ def run(output: Path, *, unchanged: bool, training_seed: int = SEED) -> None:
         "models": {"before": "original", "candidate": "candidate", "reference": "retrained"},
         "cohorts": {
             "forget": "Stratified 25% of the original training partition. Used in original training only.",
-            "holdout": "Stratified 65% of the evaluation partition. Excluded from all training.",
+            "holdout": "Stratified 35% of the evaluation partition. Excluded from all training.",
             "calibration": "One half of the remaining evaluation partition, used to select thresholds only.",
             "utility": "Other half of the remaining evaluation partition, used to measure utility only.",
         },
@@ -119,6 +117,8 @@ def run(output: Path, *, unchanged: bool, training_seed: int = SEED) -> None:
         load_losses(output / "losses.csv"), load_manifest(manifest_file), seed=SEED, include_fingerprints=True,
     )
     write_artifact(output / "metrics.json", json.dumps(result, ensure_ascii=False, indent=2) + "\n")
+    if record:
+        record_scoring(output, pixels, images, labels, groups, models)
 
 
 def main() -> None:
@@ -126,12 +126,23 @@ def main() -> None:
     parser.add_argument("output", type=Path, help="new directory for the CSV, manifest and metrics")
     parser.add_argument("--unchanged", action="store_true", help="use an unchanged candidate as a control")
     parser.add_argument("--training-seed", type=int, default=SEED, help="training randomness; the split stays fixed")
+    scoring = parser.add_mutually_exclusive_group()
+    scoring.add_argument("--record-scoring", action="store_true", help="save numeric model state and scoring hashes")
+    scoring.add_argument("--verify-scoring", action="store_true", help="replay scoring from a recorded directory")
     args = parser.parse_args()
     if not 0 <= args.training_seed < 2**32:
         parser.error("--training-seed must be between 0 and 4294967295")
     try:
-        run(args.output, unchanged=args.unchanged, training_seed=args.training_seed)
-    except OSError as error:
+        if args.verify_scoring:
+            if args.unchanged or args.training_seed != SEED:
+                parser.error("--verify-scoring reads the recorded models")
+            pixels, labels = load_digits(return_X_y=True)
+            with threadpool_limits(limits=1):
+                verify_scoring(args.output, pixels, pixels / 16.0, labels, split_examples(pixels, labels), export_losses)
+            print("Scoring inputs and replayed loss CSV match.")
+            return
+        run(args.output, unchanged=args.unchanged, training_seed=args.training_seed, record=args.record_scoring)
+    except (OSError, ValueError) as error:
         parser.exit(1, f"Demo failed: {error}\n")
     print(f"Wrote demo artifacts to {args.output}")
 
