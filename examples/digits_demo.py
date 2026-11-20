@@ -96,7 +96,7 @@ def run(output: Path, *, unchanged: bool, training_seed: int = SEED, record: boo
         "models": {"before": "original", "candidate": "candidate", "reference": "retrained"},
         "cohorts": {
             "forget": "Stratified 25% of the original training partition. Used in original training only.",
-            "holdout": "Stratified 35% of the evaluation partition. Excluded from all training.",
+            "holdout": "Stratified 65% of the evaluation partition, subject to rounding. Excluded from all training.",
             "calibration": "One half of the remaining evaluation partition, used to select thresholds only.",
             "utility": "Other half of the remaining evaluation partition, used to measure utility only.",
         },
