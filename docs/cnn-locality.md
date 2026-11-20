@@ -10,6 +10,20 @@ Compute the scaled-pixel Euclidean distance from each holdout example to its nea
 
 Repeated seeds reuse the same split. The distance bands can have different digit mixtures. This is a descriptive experiment about one architecture, one update and one split.
 
+## Observed results
+
+The CUDA run used 24 training seeds, 42 through 65, with 467 holdout images and 270 forget images. Mean values across the seeds are shown below. Higher CKA indicates more similar relationships between the holdout embeddings.
+
+| Model | Near TV | Middle TV | Far TV | Near CKA | Middle CKA | Far CKA |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Original | 0.02145 | 0.03108 | 0.06335 | 0.96473 | 0.96176 | 0.95102 |
+| Retain-only update | 0.02013 | 0.02660 | 0.05609 | 0.96547 | 0.96321 | 0.95293 |
+| Independent refit | 0.02946 | 0.03813 | 0.07733 | 0.90183 | 0.90356 | 0.87996 |
+
+The update lowered the mean prediction gap in all three bands. The far band still had the largest average gap in this experiment. Mean holdout accuracies were 97.29% for the original, 97.66% for the update and 96.42% for the independent refit. For seed 42, the fixed loss score assigned AUC 0.485 to the original, so this score showed weak membership separation. The probability and embedding comparisons measure agreement with the matched retrained model.
+
+The RTX 3050 Laptop run took 291 seconds with PyTorch 2.15.0 and CUDA 13.2. Peak memory tracked by the PyTorch CUDA allocator was 33.8 MiB. The [release archive](https://github.com/keynepekar/unlearning-audit-toolkit/releases/download/v0.7.0/experiment-results-v070.zip) includes all 216 band comparisons and the run configuration.
+
 ## Reproduce
 
 Install the demo dependencies in an isolated Python 3.12 environment.

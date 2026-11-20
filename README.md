@@ -30,11 +30,11 @@ Open `report.html` in a browser. For downstream analysis, run `unlearning-audit 
 
 ### Install the release wheel
 
-Download the `.whl` file from the [v0.6.0 release](https://github.com/keynepekar/unlearning-audit-toolkit/releases/tag/v0.6.0). From its download directory, use the GitHub CLI to verify the wheel's build provenance before installing:
+Download the `.whl` file from the [v0.7.0 release](https://github.com/keynepekar/unlearning-audit-toolkit/releases/tag/v0.7.0). Verify its build provenance with the GitHub CLI before installing.
 
 ```sh
-gh attestation verify unlearning_audit_toolkit-0.6.0-py3-none-any.whl --repo keynepekar/unlearning-audit-toolkit --source-ref refs/tags/v0.6.0
-python -m pip install --no-index --no-deps unlearning_audit_toolkit-0.6.0-py3-none-any.whl
+gh attestation verify unlearning_audit_toolkit-0.7.0-py3-none-any.whl --repo keynepekar/unlearning-audit-toolkit --source-ref refs/tags/v0.7.0
+python -m pip install --no-index --no-deps unlearning_audit_toolkit-0.7.0-py3-none-any.whl
 ```
 
 ## Reproduce the screenshot
@@ -64,6 +64,8 @@ The [scoring replay](docs/scoring-provenance.md) reproduces the Digits loss CSV 
 
 Use [grouped AUC intervals](docs/methodology.md#grouped-observations) when several forget or holdout rows come from the same independent sampling unit. A [coverage simulation](docs/cluster-auc.md) compares resampling rows and whole groups.
 
+For independently calibrated thresholds, see [upper FPR bounds](docs/fpr-bounds.md). The [large audit benchmark](docs/large-audits.md) covers a million-row CSV and compact HTML rendering.
+
 ## When ROC AUC misses a change
 
 The [ridge control experiment](docs/ridge-controls.md) compares an exact update with an unchanged model. Both have the same ROC AUC on the synthetic benchmark. The paired loss gaps and the independently retrained model reveal the difference.
@@ -75,6 +77,8 @@ The [ridge benchmark](docs/ridge-benchmark.md) tests when the update agrees with
 The [sequential experiments](docs/sequential-experiment.md) compare repeated updates with an SVD refit after each request. The guide includes the held-out alert evaluation, repeated cost and memory measurements, bootstrap coverage simulation, and the UCI Wine Quality examples.
 
 The [Wine locality experiment](docs/wine-locality.md) measures where prediction discrepancies occur after the same deletion.
+
+The [CNN locality experiment](docs/cnn-locality.md) measures prediction and embedding differences against independently retrained models on UCI Digits.
 
 The reusable [scikit-learn export example](examples/sklearn_export.py) converts fitted probability classifiers and labeled cohorts to the toolkit's CSV format. The digits demo uses it.
 
