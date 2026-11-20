@@ -33,6 +33,7 @@ def verify_comparison(
         export, manifest, targets=targets, include_fingerprints=True,
         include_loss_gaps="loss_gaps" in saved, **saved["bootstrap"],
         group_assignments=group_assignments,
+        iid_holdout="holdout_fpr_bound" in saved,
     )
     if saved != replayed:
         raise ValueError("saved metrics differ from replayed metrics")

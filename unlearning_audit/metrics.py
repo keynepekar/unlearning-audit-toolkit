@@ -1,13 +1,16 @@
 """Descriptive ROC statistics for aligned, labeled loss exports."""
 
+from bisect import bisect_left, bisect_right
 from dataclasses import dataclass
-from itertools import groupby
+from itertools import accumulate, groupby
 from math import floor, isfinite
+from operator import add, mul
 from random import Random
 from statistics import mean
 
 from .calibration import calibrated_points
 from .fingerprints import fingerprint_inputs
+from .fpr_bounds import FPR_BOUND
 from .groups import GroupIndices, align_groups, group_digest
 from .manifest import ROLES, Manifest
 from .validation import LossExport
@@ -50,10 +53,13 @@ def operating_points(points: list[RocPoint], targets: tuple[float, ...]) -> list
     end = points[-1]
     results = []
     for target in targets:
-        best = max(
-            (point for point in points if point.false_positives / end.false_positives <= target),
-            key=lambda point: (point.true_positives, -point.false_positives),
-        )
+        stop = bisect_right(points, target, key=lambda point: point.false_positives / end.false_positives)
+        if not stop:
+            raise ValueError("FPR target precedes the ROC curve")
+        # The first point with the best TPR uses the fewest false positives.
+        best = points[bisect_left(
+            points, points[stop - 1].true_positives, hi=stop, key=lambda point: point.true_positives,
+        )]
         results.append({
             "target_fpr": target,
             "fpr": best.false_positives / end.false_positives,
@@ -93,6 +99,38 @@ def _resampled_auc(ranks: tuple[list[int], list[int], int], forget_idx: list[int
     return twice_area / (2 * len(forget_idx) * len(holdout_idx))
 
 
+@dataclass(frozen=True)
+class _PrefixRanks:
+    forget_order: list[int]
+    before: list[int]
+    through: list[int]
+
+    @classmethod
+    def from_ranks(cls, ranks: tuple[list[int], list[int], int]):
+        forget, holdout, _ = ranks
+        order = sorted(range(len(forget)), key=forget.__getitem__)
+        thresholds = [forget[i] for i in order]
+        return cls(
+            order,
+            [bisect_left(thresholds, rank) for rank in holdout],
+            [bisect_right(thresholds, rank) for rank in holdout],
+        )
+
+    def area(self, forget: list[int], holdout: list[int], denominator: int) -> float:
+        cumulative = list(accumulate(map(forget.__getitem__, self.forget_order), initial=0))
+        # A strictly earlier row counts twice. An equal row occurs only in through.
+        before = map(cumulative.__getitem__, self.before)
+        through = map(cumulative.__getitem__, self.through)
+        return sum(map(mul, holdout, map(add, before, through))) / denominator
+
+
+def _sample_weights(indices: list[int], size: int) -> list[int]:
+    weights = [0] * size
+    for index in indices:
+        weights[index] += 1
+    return weights
+
+
 def paired_auc_intervals(
     vectors: dict[str, dict[str, tuple[float, ...]]], repeats: int, seed: int,
     groups: GroupIndices | None = None,
@@ -107,6 +145,12 @@ def paired_auc_intervals(
     rng = Random(seed)
     differences: dict[str, list[float]] = {name: [] for name in comparisons}
     ranks = {role: _loss_ranks(values["forget"], values["holdout"]) for role, values in vectors.items()}
+    total = forget_n + holdout_n
+    prefixes = {
+        role: _PrefixRanks.from_ranks(values)
+        for role, values in ranks.items() if total >= 4096 and 2 * values[2] >= total
+    }
+    histograms = {role: values for role, values in ranks.items() if role not in prefixes}
     for _ in range(repeats):
         if groups is None:
             forget_idx = rng.choices(range(forget_n), k=forget_n)
@@ -116,7 +160,15 @@ def paired_auc_intervals(
                 [index for group in rng.choices(groups[cohort], k=len(groups[cohort])) for index in group]
                 for cohort in ("forget", "holdout")
             )
-        areas = {role: _resampled_auc(role_ranks, forget_idx, holdout_idx) for role, role_ranks in ranks.items()}
+        areas = {
+            role: _resampled_auc(role_ranks, forget_idx, holdout_idx)
+            for role, role_ranks in histograms.items()
+        }
+        if prefixes:
+            forget = _sample_weights(forget_idx, forget_n)
+            holdout = _sample_weights(holdout_idx, holdout_n)
+            denominator = 2 * len(forget_idx) * len(holdout_idx)
+            areas.update({role: ranks.area(forget, holdout, denominator) for role, ranks in prefixes.items()})
         differences["candidate_minus_before"].append(areas["candidate"] - areas["before"])
         differences["candidate_minus_reference"].append(areas["candidate"] - areas["reference"])
     return {
@@ -136,6 +188,7 @@ def compare_losses(
     include_fingerprints: bool = False,
     include_loss_gaps: bool = False,
     group_assignments: dict[str, str] | None = None,
+    iid_holdout: bool = False,
 ) -> dict:
     """Return an aggregate, JSON-compatible audit of three aligned model exports."""
     manifest.check_alignment(set(export.losses), set(export.sample_ids))
@@ -149,6 +202,8 @@ def compare_losses(
         raise ValueError("bootstrap seed must be an integer")
     if group_assignments is not None and not repeats:
         raise ValueError("group bootstrap requires nonzero repeats")
+    if iid_holdout and ("calibration" not in export.sample_ids or group_assignments is not None):
+        raise ValueError("FPR bounds require a calibration cohort and an independent, ungrouped holdout")
     groups = align_groups(export, group_assignments) if group_assignments is not None else None
 
     counts = export.counts
@@ -205,6 +260,8 @@ def compare_losses(
     }
     if include_fingerprints:
         result["fingerprints"] = fingerprint_inputs(export, manifest)
+    if iid_holdout:
+        result["holdout_fpr_bound"] = FPR_BOUND
     if groups is not None:
         result["grouping"] = {"counts": {cohort: len(units) for cohort, units in groups.items()}}
         if include_fingerprints:

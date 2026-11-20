@@ -4,7 +4,8 @@ from random import Random
 
 from unlearning_audit.manifest import load_manifest
 from unlearning_audit.metrics import (
-    _loss_ranks, _resampled_auc, area_under_roc, compare_losses, operating_points, roc_counts,
+    _PrefixRanks, _loss_ranks, _resampled_auc, _sample_weights,
+    area_under_roc, compare_losses, operating_points, roc_counts,
 )
 from unlearning_audit.validation import load_losses
 
@@ -25,6 +26,14 @@ class MetricsTests(unittest.TestCase):
                     tuple(forget[i] for i in f), tuple(holdout[i] for i in h),
                 ))
                 self.assertEqual(_resampled_auc(ranks, f, h), expected)
+                self.assertEqual(_PrefixRanks.from_ranks(ranks).area(
+                    _sample_weights(f, len(forget)), _sample_weights(h, len(holdout)), 2 * len(f) * len(h),
+                ), expected)
+
+    def test_operating_points_keep_first_point_at_best_tpr(self):
+        points = roc_counts((0.1, 0.8), (0.2, 0.3, 0.4, 1.0))
+        result = operating_points(points, (0.75, 0.15, 0.25))
+        self.assertEqual([point["false_positives"] for point in result], [3, 0, 0])
 
     def test_roc_polarity_and_ties(self):
         self.assertEqual(area_under_roc(roc_counts((0.1,), (0.8,))), 1)

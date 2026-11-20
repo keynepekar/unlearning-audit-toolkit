@@ -31,6 +31,7 @@ def main() -> int:
     compare.add_argument("--fingerprints", action="store_true", help="record normalized input fingerprints")
     compare.add_argument("--loss-gaps", action="store_true", help="report mean absolute paired loss gaps to retraining")
     compare.add_argument("--groups", type=Path, help="sample_id,group_id CSV for grouped AUC intervals")
+    compare.add_argument("--iid-holdout", action="store_true", help="report a pointwise 95%% FPR bound for an independent iid holdout")
     report = commands.add_parser("report", help="render aggregate metrics as HTML or summary CSV")
     report.add_argument("metrics_file", type=Path)
     report.add_argument("--output", type=Path, required=True)
@@ -71,6 +72,7 @@ def main() -> int:
                 repeats=args.bootstrap, seed=args.seed, include_fingerprints=args.fingerprints,
                 include_loss_gaps=args.loss_gaps,
                 group_assignments=load_groups(args.groups) if args.groups is not None else None,
+                iid_holdout=args.iid_holdout,
             )
             write_artifact(
                 args.output, _json(result),

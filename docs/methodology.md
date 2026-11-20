@@ -22,6 +22,7 @@ The manifest is a JSON object with `schema_version` set to `1`. Give the experim
 - **ROC AUC.** The audit ranks examples by negative loss. It builds the empirical ROC curve by moving through distinct loss values, with all ties entering together. Trapezoidal integration gives the probability that a forget example outranks a holdout example, with half credit for ties. AUC below 0.5 indicates separation in the opposite direction.
 - **Descriptive operating points.** For each requested FPR cap, the toolkit reports the largest TPR on the empirical curve within the cap. Ties are handled as a group. The report shows the observed rates and their denominators. A cohort of size N can only resolve one observed false positive per N examples.
 - **Calibrated operating points.** When a calibration cohort is present, choose the largest observed calibration loss whose inclusive threshold stays within the cap. If no tied block fits, use the all-negative rule. Apply the selected threshold to the forget and holdout cohorts. The measured holdout FPR can exceed the calibration cap.
+- **Upper FPR bound.** If the model and calibration threshold were selected independently of the holdout and its rows are independent and identically distributed, `--iid-holdout` reports a pointwise 95% upper bound. [Assumptions and example](fpr-bounds.md)
 - **Paired AUC differences.** The toolkit reports candidate minus original and candidate minus retrained. A stratified percentile bootstrap resamples each cohort with replacement and uses the same resampled indices for all three models. Its 95% interval describes variability across examples for these fixed models. Repeat training separately to study variation across model fits.
 - **Utility.** If provided, the utility cohort contributes a separate mean loss for each model. Its interpretation depends on the declared loss and on how the cohort was formed.
 - **Paired loss gaps.** With `compare --loss-gaps`, report the mean absolute difference between each model's loss and the reference loss on the same examples, separately by cohort. This keeps information about the magnitude of differences that ROC ranks discard. [Controlled ridge example](ridge-controls.md)
@@ -44,7 +45,7 @@ The example uses singleton groups to illustrate the file format. Grouped audits 
 
 When group membership is unavailable, `compare --bootstrap 0` omits the intervals. [Coverage simulation and sources](cluster-auc.md)
 
-Use `report --format roc-csv` to export every plotted ROC point with its false-positive and true-positive counts. The HTML report provides text and tables alongside the chart. Its chart lines differ by both color and stroke pattern.
+Use `report --format roc-csv` to export every ROC point with its false-positive and true-positive counts. The HTML report provides text and tables alongside the chart. Its chart lines differ by both color and stroke pattern. [Display simplification for dense curves](large-audits.md)
 
 ## Verify a saved audit
 

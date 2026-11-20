@@ -7,7 +7,7 @@ from pathlib import Path
 
 from unlearning_audit.manifest import load_manifest
 from unlearning_audit.metrics import compare_losses
-from unlearning_audit.report import render_report, render_roc_csv, render_summary_csv
+from unlearning_audit.report import _display_roc, render_report, render_roc_csv, render_summary_csv
 from unlearning_audit.validation import load_losses
 
 EXAMPLES = Path(__file__).resolve().parents[1] / "examples"
@@ -81,3 +81,17 @@ class ReportTests(unittest.TestCase):
         self.assertEqual(len(rows), sum(len(model["roc"]) for model in self.metrics["models"].values()))
         self.assertEqual((rows[0]["fpr"], rows[0]["tpr"]), ("0.0", "0.0"))
         self.assertEqual((rows[-1]["fpr"], rows[-1]["tpr"]), ("1.0", "1.0"))
+
+    def test_dense_display_preserves_anchors_and_cell_boundaries(self):
+        points = [[i, i] for i in range(1001)]
+        model = {
+            "roc": points,
+            "operating_points": [{"false_positives": 3, "true_positives": 3}],
+            "calibrated_points": [{"false_positives": 63, "true_positives": 63}],
+        }
+        selected = list(_display_roc(model, 1000, 1000, 20, 20))
+        self.assertEqual(selected[:4], [[0, 0], [3, 3], [49, 49], [50, 50]])
+        self.assertIn([63, 63], selected)
+        self.assertEqual(selected[-1], [1000, 1000])
+        self.assertEqual(selected, sorted(selected))
+        self.assertLess(len(selected), 50)

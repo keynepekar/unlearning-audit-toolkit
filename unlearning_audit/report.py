@@ -6,10 +6,12 @@ from csv import writer
 from html import escape
 from importlib.resources import files
 from io import StringIO
+from itertools import groupby
 from pathlib import Path
 from sys import float_info
 
 from .fingerprints import validate_fingerprints
+from .fpr_bounds import FPR_BOUND, calibrated_fpr_bound
 from .manifest import ROLES, Manifest, _unique_fields
 from .metrics import RocPoint, area_under_roc, operating_points
 
@@ -104,11 +106,17 @@ def validate_metrics(value: object) -> tuple[dict, Manifest]:
         fields.add("loss_gaps")
     if isinstance(value, dict) and "grouping" in value:
         fields.add("grouping")
+    if isinstance(value, dict) and "holdout_fpr_bound" in value:
+        fields.add("holdout_fpr_bound")
     result = _mapping(value, fields, "metrics")
     if type(result["schema_version"]) is not int or result["schema_version"] != 1:
         raise ValueError("unsupported metrics schema_version (expected 1)")
     manifest = Manifest.from_dict(result["manifest"])
     counts = _mapping(result["counts"], set(manifest.cohorts), "cohort counts")
+    if "holdout_fpr_bound" in result and (
+        result["holdout_fpr_bound"] != FPR_BOUND or "calibration" not in counts or "grouping" in result
+    ):
+        raise ValueError("invalid calibrated holdout FPR bound configuration")
     for cohort, size in counts.items():
         _count(size, 1, 2**53 - 1, f"{cohort} count")
     if "grouping" in result:
@@ -184,6 +192,32 @@ def validate_metrics(value: object) -> tuple[dict, Manifest]:
     return result, manifest
 
 
+def _display_roc(model: dict, holdout: int, forget: int, width: int, height: int):
+    points = model["roc"]
+    if len(points) <= 2 * (width + height + 1):
+        yield from points
+        return
+    anchors = {
+        (point["false_positives"], point["true_positives"])
+        for key in ("operating_points", "calibrated_points") for point in model.get(key, ())
+    }
+
+    def cell(point):
+        fp, tp = point
+        return fp * width // holdout, tp * height // forget
+
+    # A monotone ROC never revisits a display cell. Keep its entry and exit.
+    for _, run in groupby(points, key=cell):
+        first = last = next(run)
+        yield first
+        for point in run:
+            last = point
+            if tuple(point) in anchors:
+                yield point
+        if last != first and tuple(last) not in anchors:
+            yield last
+
+
 def _chart(result: dict) -> str:
     left, top, width, height = 65, 20, 462, 270
     bottom = top + height
@@ -202,7 +236,7 @@ def _chart(result: dict) -> str:
     for role in ROLES:
         points = " ".join(
             f"{left + width * fp / counts['holdout']:.2f},{bottom - height * tp / counts['forget']:.2f}"
-            for fp, tp in result["models"][role]["roc"]
+            for fp, tp in _display_roc(result["models"][role], counts["holdout"], counts["forget"], width, height)
         )
         dash = {"before": "", "candidate": ' stroke-dasharray="8 3"', "reference": ' stroke-dasharray="2 3"'}[role]
         paths.append(f'<polyline points="{points}" stroke="{COLORS[role]}"{dash}/>')
@@ -210,7 +244,8 @@ def _chart(result: dict) -> str:
         '<svg viewBox="0 0 550 356" role="img" aria-labelledby="roc-title roc-description">'
         '<title id="roc-title">ROC curves for the three models</title>'
         '<desc id="roc-description">Compare true-positive rates as the false-positive rate increases. '
-        'The diagonal shows chance-level ranking. The report also lists AUC values and operating points as text and tables.</desc>'
+        'The diagonal shows chance-level ranking. Dense curves are simplified for display. '
+        'The report lists exact AUC values and operating points as text and tables.</desc>'
         + "".join(ticks)
         + f'<path class="chance" d="M{left} {bottom}L{left + width} {top}"/>'
         + "".join(paths)
@@ -234,6 +269,7 @@ def _operating_table(result: dict, *, calibrated: bool = False) -> str:
     rows = []
     field = "calibrated_points" if calibrated else "operating_points"
     calibration_header = '<th scope="col">Calibration FPR</th>' if calibrated else ""
+    show_bound = calibrated and "holdout_fpr_bound" in result
     for role in ROLES:
         for point in result["models"][role][field]:
             calibration_cell = ""
@@ -241,16 +277,23 @@ def _operating_table(result: dict, *, calibrated: bool = False) -> str:
                 events = point["calibration_false_positives"]
                 total = counts["calibration"]
                 calibration_cell = f"<td>{events / total:.2%} <small>({events}/{total})</small></td>"
+            bound_cell = ""
+            if show_bound:
+                bound = calibrated_fpr_bound(point, counts["holdout"])
+                label = f"{100 * bound:.3g}%" if bound is not None else "All-negative rule"
+                bound_cell = f"<td>{label}</td>"
             rows.append(
                 f'<tr><th scope="row">{LABELS[role]}</th><td>{point["target_fpr"]:.3g}</td>{calibration_cell}'
-                f'<td>{point["fpr"]:.2%} <small>({point["false_positives"]}/{counts["holdout"]})</small></td>'
+                f'<td>{point["fpr"]:.2%} <small>({point["false_positives"]}/{counts["holdout"]})</small></td>{bound_cell}'
                 f'<td>{point["tpr"]:.2%} <small>({point["true_positives"]}/{counts["forget"]})</small></td></tr>'
             )
     return (
         '<div class="table-wrap" tabindex="0" role="region" aria-label="Operating point data">'
         '<table><thead><tr><th scope="col">Model</th><th scope="col">FPR cap (rate)</th>'
         + calibration_header
-        + '<th scope="col">Observed FPR</th><th scope="col">Observed TPR</th></tr></thead><tbody>'
+        + '<th scope="col">Observed FPR</th>'
+        + ('<th scope="col">95% upper FPR bound</th>' if show_bound else '')
+        + '<th scope="col">Observed TPR</th></tr></thead><tbody>'
         + "".join(rows) + "</tbody></table></div>"
     )
 
@@ -262,6 +305,9 @@ def _calibration(result: dict) -> str:
         '<section class="panel"><h2>Calibrated operating points</h2>'
         '<p>Each threshold is selected using the separate calibration cohort. '
         'The observed holdout FPR can exceed the calibration cap.</p>'
+        + ('<p>Bounds assume independent, identically distributed holdout rows. Each bound is pointwise '
+           'for its threshold and model. The all-negative rule has no numerical threshold.</p>'
+           if "holdout_fpr_bound" in result else '')
         + _operating_table(result, calibrated=True)
         + '</section>'
     )
@@ -371,7 +417,7 @@ def render_report(document: object) -> str:
   <div class="grid-panels">
     <section class="panel">
       <h2>Receiver operating characteristic</h2>
-      <p>Lower loss ranks an example higher. The diagonal marks chance-level ranking.</p>
+      <p>Lower loss ranks an example higher. The diagonal marks chance-level ranking. The ROC CSV contains all points.</p>
       <figure>
         {_chart(result)}
         <figcaption>
@@ -414,20 +460,24 @@ def render_summary_csv(document: object) -> str:
     result, _ = validate_metrics(document)
     stream = StringIO(newline="")
     output = writer(stream, lineterminator="\n")
+    bounds = "holdout_fpr_bound" in result
     output.writerow((
         "role", "method", "auc", "mean_utility_loss", "target_fpr", "calibration_false_positives",
         "calibration_count", "false_positives", "holdout_count", "fpr", "true_positives", "forget_count", "tpr",
+        *(("fpr_upper_95",) if bounds else ()),
     ))
     counts = result["counts"]
     for role in ROLES:
         model = result["models"][role]
         for method, field in (("descriptive", "operating_points"), ("calibrated", "calibrated_points")):
             for point in model.get(field, []):
+                bound = calibrated_fpr_bound(point, counts["holdout"]) if bounds and method == "calibrated" else None
                 output.writerow((
                     role, method, model["auc"], model["mean_utility_loss"], point["target_fpr"],
                     point.get("calibration_false_positives"), counts["calibration"] if method == "calibrated" else None,
                     point["false_positives"], counts["holdout"], point["fpr"],
                     point["true_positives"], counts["forget"], point["tpr"],
+                    *((bound,) if bounds else ()),
                 ))
     return stream.getvalue()
 
