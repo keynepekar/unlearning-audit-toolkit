@@ -3,13 +3,13 @@
 Set a threshold on the calibration cohort and measure false positives on a separate holdout. With `--iid-holdout`, the HTML and summary CSV also show a one-sided 95% upper bound for that threshold's holdout FPR. Use this option when holdout rows are independent, identically distributed draws from the target non-member population and the model and threshold were selected independently of them. The option requires a calibration cohort and rejects grouped comparisons. It applies pointwise to each model and threshold. Simultaneous claims across thresholds or models require an additional procedure.
 
 ```sh
-python examples/digits_demo.py digits-demo
-unlearning-audit compare digits-demo/losses.csv --manifest digits-demo/manifest.json --iid-holdout --fpr 0.001 --fpr 0.01 --fpr 0.1 --fingerprints --output digits-demo/bounds.json
-unlearning-audit verify digits-demo/bounds.json digits-demo/losses.csv --manifest digits-demo/manifest.json
-unlearning-audit report digits-demo/bounds.json --output digits-demo/bounds.html
+python examples/fpr_demo.py fpr-demo
+unlearning-audit compare fpr-demo/losses.csv --manifest fpr-demo/manifest.json --iid-holdout --fpr 0.001 --fpr 0.01 --fpr 0.1 --fingerprints --output fpr-demo/bounds.json
+unlearning-audit verify fpr-demo/bounds.json fpr-demo/losses.csv --manifest fpr-demo/manifest.json
+unlearning-audit report fpr-demo/bounds.json --output fpr-demo/bounds.html
 ```
 
-With zero false positives in 467 independent holdout rows, the upper bound is approximately 0.639%. Reaching a bound of 0.1% with zero events requires at least 2,995 independent rows. When calibration has too few rows or encounters ties and selects the all-negative rule, the table identifies that rule and leaves the bound field blank. The empirical cap and the observed FPR are still reported.
+In this synthetic run, the 0.1% calibration cap yields one false positive in 467 holdout rows and an upper bound of 1.224%. With zero false positives in 467 independent rows, the bound would be approximately 0.639%. Reaching a bound of 0.1% with zero events requires at least 2,995 independent rows. When calibration has too few rows or encounters ties and selects the all-negative rule, the table identifies that rule and leaves the bound field blank. The empirical cap and the observed FPR are still reported.
 
 ## Computation
 

@@ -39,9 +39,10 @@ jobs:
       - run: unlearning-audit report demo/metrics.json --format csv --output demo/summary.csv
       - run: unlearning-audit report demo/metrics.json --format roc-csv --output demo/roc.csv
       - run: unlearning-audit verify demo/metrics.json demo/losses.csv --manifest demo/manifest.json
-      - run: unlearning-audit compare demo/losses.csv --manifest demo/manifest.json --iid-holdout --bootstrap 0 --fpr 0.001 --fpr 0.01 --fingerprints --output demo/fpr-bounds.json
-      - run: unlearning-audit verify demo/fpr-bounds.json demo/losses.csv --manifest demo/manifest.json
-      - run: unlearning-audit report demo/fpr-bounds.json --format csv --output demo/fpr-bounds.csv
+      - run: python examples/fpr_demo.py fpr-demo
+      - run: unlearning-audit compare fpr-demo/losses.csv --manifest fpr-demo/manifest.json --iid-holdout --bootstrap 0 --fpr 0.001 --fpr 0.01 --fingerprints --output fpr-demo/bounds.json
+      - run: unlearning-audit verify fpr-demo/bounds.json fpr-demo/losses.csv --manifest fpr-demo/manifest.json
+      - run: unlearning-audit report fpr-demo/bounds.json --format csv --output fpr-demo/bounds.csv
       - run: python examples/generate_audit_load.py load-smoke --samples 5000 --distinct
       - run: unlearning-audit compare load-smoke/losses.csv --manifest load-smoke/manifest.json --groups load-smoke/groups.csv --bootstrap 200 --fingerprints --output load-smoke/metrics.json
       - run: unlearning-audit verify load-smoke/metrics.json load-smoke/losses.csv --manifest load-smoke/manifest.json --groups load-smoke/groups.csv
