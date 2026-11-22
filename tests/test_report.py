@@ -41,6 +41,29 @@ class ReportTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "curve endpoints"):
             render_report(self.metrics)
 
+    def test_rejects_intervals_without_bootstrap(self):
+        self.metrics["auc_deltas"]["candidate_minus_before"]["interval"] = [-1, 0]
+        with self.assertRaisesRegex(ValueError, "AUC intervals do not match"):
+            render_report(self.metrics)
+
+    def test_reports_require_the_same_bootstrap_settings_as_compare(self):
+        for repeats, message in ((10, "bootstrap repeats"), (200, "AUC intervals do not match")):
+            with self.subTest(repeats=repeats):
+                self.metrics["bootstrap"]["repeats"] = repeats
+                with self.assertRaisesRegex(ValueError, message):
+                    render_report(self.metrics)
+
+    def test_tiny_cohorts_can_skip_intervals_with_bootstrap_enabled(self):
+        export = load_losses(EXAMPLES / "comparison.csv")
+        singleton = replace(
+            export,
+            sample_ids={cohort: ids[:1] for cohort, ids in export.sample_ids.items()},
+            losses={model: {cohort: losses[:1] for cohort, losses in values.items()}
+                    for model, values in export.losses.items()},
+        )
+        metrics = compare_losses(singleton, load_manifest(EXAMPLES / "manifest.json"), repeats=200)
+        self.assertTrue(render_report(metrics))
+
     def test_calibrated_points_follow_the_saved_roc_curve(self):
         export = load_losses(EXAMPLES / "comparison.csv")
         manifest = load_manifest(EXAMPLES / "manifest.json")

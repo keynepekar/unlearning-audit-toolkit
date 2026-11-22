@@ -28,26 +28,31 @@ def load_losses(path: Path) -> LossExport:
     models: dict[str, dict[str, float]] = {}
 
     with path.open(encoding="utf-8-sig", newline="") as stream:
-        reader = csv.DictReader(stream, strict=True)
-        header = reader.fieldnames or []
+        reader = csv.reader(stream, strict=True)
+        header = next(reader, [])
         if len(header) != len(COLUMNS) or set(header) != COLUMNS:
             raise ValueError("expected columns: sample_id, cohort, model, loss")
+        sample_col, cohort_col, model_col, loss_col = map(
+            header.index, ("sample_id", "cohort", "model", "loss"),
+        )
 
         for row in reader:
+            if not row:
+                continue
             line = reader.line_num
-            if None in row or any(value is None for value in row.values()):
+            if len(row) != len(header):
                 raise ValueError(f"line {line}: expected four fields")
 
-            sample = row["sample_id"].strip()
-            model = row["model"].strip()
-            cohort = row["cohort"].strip()
+            sample = row[sample_col].strip()
+            model = row[model_col].strip()
+            cohort = row[cohort_col].strip()
             if not sample or not model:
                 raise ValueError(f"line {line}: sample_id and model must be non-empty")
             if cohort not in COHORTS:
                 raise ValueError(f"line {line}: expected one of {', '.join(sorted(COHORTS))}")
 
             try:
-                loss = float(row["loss"])
+                loss = float(row[loss_col])
             except ValueError as error:
                 raise ValueError(f"line {line}: loss must be a number") from error
             if not math.isfinite(loss) or loss < 0:

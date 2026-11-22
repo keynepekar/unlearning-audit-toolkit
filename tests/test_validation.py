@@ -22,6 +22,21 @@ class ValidationTests(unittest.TestCase):
             path.write_text("\n".join([header, *reversed(rows)]), encoding="utf-8")
             self.assertEqual(load_losses(path), load_losses(EXAMPLE))
 
+    def test_reads_reordered_columns_and_quoted_values(self):
+        content = (
+            "loss,model,cohort,sample_id\n"
+            '0.1,before,forget,"first, row"\n\n'
+            '0.2,after,forget,"first, row"\n'
+            '0.3,before,holdout,"second\nrow"\n'
+            '0.4,after,holdout,"second\nrow"\n'
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "reordered.csv"
+            path.write_text(content, encoding="utf-8-sig", newline="")
+            export = load_losses(path)
+        self.assertEqual(export.sample_ids, {"forget": ("first, row",), "holdout": ("second\nrow",)})
+        self.assertEqual(export.losses["after"], {"forget": (0.2,), "holdout": (0.4,)})
+
     def test_rejects_invalid_exports(self):
         cases = {
             "duplicate sample": VALID + "f01,forget,before,0.12\n",

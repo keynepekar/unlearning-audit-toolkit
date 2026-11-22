@@ -30,10 +30,14 @@ def verify_comparison(
 
     targets = tuple(point["target_fpr"] for point in saved["models"]["before"]["operating_points"])
     replayed = compare_losses(
-        export, manifest, targets=targets, include_fingerprints=True,
+        export, manifest, targets=targets,
         include_loss_gaps="loss_gaps" in saved, **saved["bootstrap"],
         group_assignments=group_assignments,
         iid_holdout="holdout_fpr_bound" in saved,
     )
+    # The normalized inputs and, when applicable, the group partition already matched.
+    replayed["fingerprints"] = expected
+    if grouping is not None:
+        replayed["grouping"]["groups_sha256"] = grouping["groups_sha256"]
     if saved != replayed:
         raise ValueError("saved metrics differ from replayed metrics")

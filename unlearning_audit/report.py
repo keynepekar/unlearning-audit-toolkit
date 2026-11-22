@@ -2,6 +2,7 @@
 
 import json
 import re
+from bisect import bisect_left
 from csv import writer
 from html import escape
 from importlib.resources import files
@@ -13,7 +14,7 @@ from sys import float_info
 from .fingerprints import validate_fingerprints
 from .fpr_bounds import FPR_BOUND, calibrated_fpr_bound
 from .manifest import ROLES, Manifest, _unique_fields
-from .metrics import RocPoint, area_under_roc, operating_points
+from .metrics import area_under_roc, operating_points
 
 LABELS = {"before": "Original", "candidate": "Candidate", "reference": "Retrained"}
 COLORS = {"before": "#263d73", "candidate": "#006b60", "reference": "#a05a24"}
@@ -58,8 +59,7 @@ def _check_curve(points: object, holdout: int, forget: int) -> None:
 
 
 def _check_operating_points(
-    rows: object, holdout: int, forget: int, *, calibration: int | None = None,
-    roc: frozenset[RocPoint] = frozenset(),
+    rows: object, holdout: int, forget: int, roc: list[list[int]], *, calibration: int | None = None,
 ) -> tuple[float, ...]:
     if not isinstance(rows, list) or not rows:
         raise ValueError("missing operating points")
@@ -80,7 +80,9 @@ def _check_operating_points(
             calibrated_fp = _count(row["calibration_false_positives"], 0, calibration, "calibration count")
             if calibrated_fp / calibration > target:
                 raise ValueError("calibration count exceeds its FPR target")
-            if RocPoint(fp, tp) not in roc:
+            point = [fp, tp]
+            index = bisect_left(roc, point)
+            if index == len(roc) or roc[index] != point:
                 raise ValueError("calibrated operating point does not lie on the ROC curve")
             if calibrated_fp < previous_calibrated or fp < previous_fp or tp < previous_tp:
                 raise ValueError("calibrated operating point counts must be nondecreasing")
@@ -143,11 +145,11 @@ def validate_metrics(value: object) -> tuple[dict, Manifest]:
     for metrics in models.values():
         _mapping(metrics, model_fields, "model metrics")
         auc = _number(metrics["auc"], 0, 1, "AUC")
-        _check_curve(metrics["roc"], counts["holdout"], counts["forget"])
-        roc = [RocPoint(*point) for point in metrics["roc"]]
+        roc = metrics["roc"]
+        _check_curve(roc, counts["holdout"], counts["forget"])
         if abs(auc - area_under_roc(roc)) > 1e-12:
             raise ValueError("AUC does not match the ROC curve")
-        observed = _check_operating_points(metrics["operating_points"], counts["holdout"], counts["forget"])
+        observed = _check_operating_points(metrics["operating_points"], counts["holdout"], counts["forget"], roc)
         if metrics["operating_points"] != operating_points(roc, observed):
             raise ValueError("descriptive operating points do not match the ROC curve")
         if targets is not None and observed != targets:
@@ -156,7 +158,7 @@ def validate_metrics(value: object) -> tuple[dict, Manifest]:
         if "calibration" in counts:
             calibrated = _check_operating_points(
                 metrics["calibrated_points"], counts["holdout"], counts["forget"],
-                calibration=counts["calibration"], roc=frozenset(roc),
+                roc, calibration=counts["calibration"],
             )
             if calibrated != targets:
                 raise ValueError("calibrated and descriptive FPR targets must match")
@@ -180,11 +182,15 @@ def validate_metrics(value: object) -> tuple[dict, Manifest]:
             lower = _number(interval[0], -1, 1, "lower AUC interval")
             _number(interval[1], lower, 1, "upper AUC interval")
     bootstrap = _mapping(result["bootstrap"], {"repeats", "seed"}, "bootstrap")
-    _count(bootstrap["repeats"], 0, 10_000, "bootstrap repeats")
-    if "grouping" in result and (
-        bootstrap["repeats"] < 200 or any(delta["interval"] is None for delta in deltas.values())
-    ):
+    repeats = _count(bootstrap["repeats"], 0, 10_000, "bootstrap repeats")
+    if 0 < repeats < 200:
+        raise ValueError("bootstrap repeats must be 0 or between 200 and 10000")
+    has_intervals = repeats > 0 and min(counts["forget"], counts["holdout"]) >= 2
+    intervals_match = all((delta["interval"] is not None) == has_intervals for delta in deltas.values())
+    if "grouping" in result and (not has_intervals or not intervals_match):
         raise ValueError("grouped comparisons require bootstrap intervals")
+    if not intervals_match:
+        raise ValueError("AUC intervals do not match bootstrap settings and cohort counts")
     if type(bootstrap["seed"]) is not int:
         raise ValueError("invalid bootstrap seed")
     if not isinstance(result["warnings"], list) or any(not isinstance(item, str) for item in result["warnings"]):

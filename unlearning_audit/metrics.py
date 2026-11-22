@@ -1,12 +1,14 @@
 """Descriptive ROC statistics for aligned, labeled loss exports."""
 
 from bisect import bisect_left, bisect_right
+from collections.abc import Sequence
 from dataclasses import dataclass
-from itertools import accumulate, groupby
+from itertools import accumulate, groupby, pairwise
 from math import floor, isfinite
-from operator import add, mul
+from operator import add, itemgetter, mul
 from random import Random
 from statistics import mean
+from typing import NamedTuple
 
 from .calibration import calibrated_points
 from .fingerprints import fingerprint_inputs
@@ -16,8 +18,7 @@ from .manifest import ROLES, Manifest
 from .validation import LossExport
 
 
-@dataclass(frozen=True)
-class RocPoint:
+class RocPoint(NamedTuple):
     false_positives: int
     true_positives: int
 
@@ -37,35 +38,32 @@ def roc_counts(forget: tuple[float, ...], holdout: tuple[float, ...]) -> list[Ro
     return points
 
 
-def area_under_roc(points: list[RocPoint]) -> float:
+def area_under_roc(points: Sequence[Sequence[int]]) -> float:
     """Integrate a ROC path with trapezoids in integer count space."""
     twice_area = sum(
-        (right.false_positives - left.false_positives)
-        * (left.true_positives + right.true_positives)
-        for left, right in zip(points, points[1:])
+        (right_fp - left_fp) * (left_tp + right_tp)
+        for (left_fp, left_tp), (right_fp, right_tp) in pairwise(points)
     )
-    end = points[-1]
-    return twice_area / (2 * end.false_positives * end.true_positives)
+    holdout, forget = points[-1]
+    return twice_area / (2 * holdout * forget)
 
 
-def operating_points(points: list[RocPoint], targets: tuple[float, ...]) -> list[dict]:
+def operating_points(points: Sequence[Sequence[int]], targets: tuple[float, ...]) -> list[dict]:
     """Return the best observed TPR within each empirical FPR budget."""
-    end = points[-1]
+    holdout, forget = points[-1]
     results = []
     for target in targets:
-        stop = bisect_right(points, target, key=lambda point: point.false_positives / end.false_positives)
+        stop = bisect_right(points, target, key=lambda point: point[0] / holdout)
         if not stop:
             raise ValueError("FPR target precedes the ROC curve")
         # The first point with the best TPR uses the fewest false positives.
-        best = points[bisect_left(
-            points, points[stop - 1].true_positives, hi=stop, key=lambda point: point.true_positives,
-        )]
+        fp, tp = points[bisect_left(points, points[stop - 1][1], hi=stop, key=itemgetter(1))]
         results.append({
             "target_fpr": target,
-            "fpr": best.false_positives / end.false_positives,
-            "tpr": best.true_positives / end.true_positives,
-            "false_positives": best.false_positives,
-            "true_positives": best.true_positives,
+            "fpr": fp / holdout,
+            "tpr": tp / forget,
+            "false_positives": fp,
+            "true_positives": tp,
         })
     return results
 
@@ -214,7 +212,7 @@ def compare_losses(
         points = roc_counts(values["forget"], values["holdout"])
         models[role] = {
             "auc": area_under_roc(points),
-            "roc": [[point.false_positives, point.true_positives] for point in points],
+            "roc": [list(point) for point in points],
             "operating_points": operating_points(points, targets),
             "mean_utility_loss": mean(values["utility"]) if "utility" in values else None,
         }
