@@ -149,20 +149,8 @@ def _sample_weights(indices: list[int], size: int) -> list[int]:
     return weights
 
 
-def paired_auc_intervals(
-    vectors: dict[str, dict[str, tuple[float, ...]]], repeats: int, seed: int,
-    groups: GroupIndices | None = None,
-) -> dict[str, list[float] | None]:
-    """Resample within each cohort using the same indices for all model roles."""
-    comparisons = ("candidate_minus_before", "candidate_minus_reference")
-    forget_n = len(vectors["candidate"]["forget"])
-    holdout_n = len(vectors["candidate"]["holdout"])
-    if not repeats or min(forget_n, holdout_n) < 2:
-        return dict.fromkeys(comparisons)
-
+def _python_auc_draws(ranks, forget_n, holdout_n, repeats, seed, groups):
     rng = Random(seed)
-    differences: dict[str, list[float]] = {name: [] for name in comparisons}
-    ranks = {role: _loss_ranks(values["forget"], values["holdout"]) for role, values in vectors.items()}
     total = forget_n + holdout_n
     prefixes = {
         role: _PrefixRanks.from_ranks(values)
@@ -187,6 +175,31 @@ def paired_auc_intervals(
             holdout = _sample_weights(holdout_idx, holdout_n)
             denominator = 2 * len(forget_idx) * len(holdout_idx)
             areas.update({role: ranks.area(forget, holdout, denominator) for role, ranks in prefixes.items()})
+        yield areas
+
+
+def paired_auc_intervals(
+    vectors: dict[str, dict[str, tuple[float, ...]]], repeats: int, seed: int,
+    groups: GroupIndices | None = None, *, backend: str = "python",
+) -> dict[str, list[float] | None]:
+    """Resample within each cohort using the same indices for all model roles."""
+    if backend not in ("python", "numpy"):
+        raise ValueError("bootstrap backend must be python or numpy")
+    comparisons = ("candidate_minus_before", "candidate_minus_reference")
+    forget_n = len(vectors["candidate"]["forget"])
+    holdout_n = len(vectors["candidate"]["holdout"])
+    if not repeats or min(forget_n, holdout_n) < 2:
+        return dict.fromkeys(comparisons)
+
+    draw_aucs = _python_auc_draws
+    if backend == "numpy":
+        try:
+            from ._bootstrap_numpy import auc_draws as draw_aucs
+        except ImportError as error:
+            raise ValueError("NumPy bootstrap requires the fast extra (pip install 'unlearning-audit-toolkit[fast]')") from error
+    ranks = {role: _loss_ranks(values["forget"], values["holdout"]) for role, values in vectors.items()}
+    differences: dict[str, list[float]] = {name: [] for name in comparisons}
+    for areas in draw_aucs(ranks, forget_n, holdout_n, repeats, seed, groups):
         differences["candidate_minus_before"].append(areas["candidate"] - areas["before"])
         differences["candidate_minus_reference"].append(areas["candidate"] - areas["reference"])
     return {
@@ -207,6 +220,7 @@ def compare_losses(
     include_loss_gaps: bool = False,
     group_assignments: dict[str, str] | None = None,
     iid_holdout: bool = False,
+    bootstrap_backend: str = "python",
 ) -> dict:
     """Return an aggregate, JSON-compatible audit of three aligned model exports."""
     manifest.check_alignment(set(export.losses), set(export.sample_ids))
@@ -241,7 +255,7 @@ def compare_losses(
                 values["forget"], values["holdout"], values["calibration"], targets
             )
 
-    intervals = paired_auc_intervals(vectors, repeats, seed, groups)
+    intervals = paired_auc_intervals(vectors, repeats, seed, groups, backend=bootstrap_backend)
     deltas = {
         f"candidate_minus_{role}": {
             "estimate": models["candidate"]["auc"] - models[role]["auc"],

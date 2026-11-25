@@ -41,6 +41,9 @@ def main() -> int:
     verify.add_argument("csv_file", type=Path)
     verify.add_argument("--manifest", type=Path, required=True)
     verify.add_argument("--groups", type=Path, help="group assignments used in the saved comparison")
+    for command in (compare, verify):
+        command.add_argument("--bootstrap-backend", choices=("python", "numpy"), default="python",
+                             help="exact bootstrap implementation (NumPy requires the fast extra)")
     study = commands.add_parser("study", help="summarize training repeats on a fixed split")
     study.add_argument("metrics_files", type=Path, nargs="+")
     study.add_argument("--output", type=Path, required=True)
@@ -63,7 +66,8 @@ def main() -> int:
         manifest = load_manifest(args.manifest) if args.manifest else None
         if args.command == "verify":
             groups = load_groups(args.groups) if args.groups is not None else None
-            verify_comparison(load_metrics(args.metrics_file), export, manifest, group_assignments=groups)
+            verify_comparison(load_metrics(args.metrics_file), export, manifest, group_assignments=groups,
+                              bootstrap_backend=args.bootstrap_backend)
             print("Input fingerprints and replayed metrics match.")
             return 0
         if args.command == "compare":
@@ -73,6 +77,7 @@ def main() -> int:
                 include_loss_gaps=args.loss_gaps,
                 group_assignments=load_groups(args.groups) if args.groups is not None else None,
                 iid_holdout=args.iid_holdout,
+                bootstrap_backend=args.bootstrap_backend,
             )
             write_artifact(
                 args.output, _json(result),

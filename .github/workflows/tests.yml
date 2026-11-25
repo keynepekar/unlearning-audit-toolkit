@@ -46,6 +46,9 @@ jobs:
       - run: python examples/generate_audit_load.py load-smoke --samples 5000 --distinct
       - run: unlearning-audit compare load-smoke/losses.csv --manifest load-smoke/manifest.json --groups load-smoke/groups.csv --bootstrap 200 --fingerprints --output load-smoke/metrics.json
       - run: unlearning-audit verify load-smoke/metrics.json load-smoke/losses.csv --manifest load-smoke/manifest.json --groups load-smoke/groups.csv
+      - run: unlearning-audit compare load-smoke/losses.csv --manifest load-smoke/manifest.json --groups load-smoke/groups.csv --bootstrap 200 --bootstrap-backend numpy --fingerprints --output load-smoke/fast.json
+      - run: cmp load-smoke/metrics.json load-smoke/fast.json
+      - run: unlearning-audit verify load-smoke/metrics.json load-smoke/losses.csv --manifest load-smoke/manifest.json --groups load-smoke/groups.csv --bootstrap-backend numpy
       - run: unlearning-audit compare examples/comparison.csv --manifest examples/manifest.json --groups examples/groups.csv --fingerprints --output grouped.json
       - run: unlearning-audit verify grouped.json examples/comparison.csv --manifest examples/manifest.json --groups examples/groups.csv
       - run: unlearning-audit report grouped.json --output grouped.html

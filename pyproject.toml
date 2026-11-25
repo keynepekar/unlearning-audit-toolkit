@@ -4,13 +4,16 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "unlearning-audit-toolkit"
-version = "0.7.0"
+version = "0.8.0"
 description = "Compare aligned loss exports from machine unlearning experiments."
 readme = "README.md"
 requires-python = ">=3.12"
 license = "MIT"
 license-files = ["LICENSE"]
 dependencies = []
+
+[project.optional-dependencies]
+fast = ["numpy>=2.5.4,<3"]
 
 [project.scripts]
 unlearning-audit = "unlearning_audit.__main__:main"

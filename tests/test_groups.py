@@ -1,5 +1,6 @@
 import unittest
 from dataclasses import replace
+from importlib.util import find_spec
 from pathlib import Path
 from random import Random
 from tempfile import TemporaryDirectory
@@ -67,6 +68,18 @@ class GroupTests(unittest.TestCase):
         verify_comparison(metrics, self.export, self.manifest, group_assignments=relabeled)
         with self.assertRaisesRegex(ValueError, "groups_sha256"):
             verify_comparison(metrics, self.export, self.manifest, group_assignments={**self.groups, "f2": "b"})
+
+    @unittest.skipUnless(find_spec("numpy"), "NumPy is optional")
+    def test_numpy_matches_and_replays_python_with_and_without_unequal_groups(self):
+        for groups in (None, self.groups):
+            for seed in (-17, 42, 2**80 + 13):
+                with self.subTest(groups=groups, seed=seed):
+                    options = dict(group_assignments=groups, seed=seed, repeats=400, include_fingerprints=True)
+                    python = compare_losses(self.export, self.manifest, **options)
+                    numpy = compare_losses(self.export, self.manifest, bootstrap_backend="numpy", **options)
+                    self.assertEqual(numpy, python)
+                    verify_comparison(python, self.export, self.manifest, group_assignments=groups,
+                                      bootstrap_backend="numpy")
 
     def test_rejects_incomplete_shared_and_single_groups(self):
         for groups, message in (

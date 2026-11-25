@@ -33,5 +33,7 @@
 
 ## Example data and software
 
+- The optional NumPy backend uses NumPy's legacy MT19937 generator with the state from CPython to reproduce paired draws. The rank accounting and parity checks are specific to this toolkit. [NumPy reference](https://numpy.org/doc/stable/reference/random/legacy.html) · [Benchmark and implementation](bootstrap-backend.md)
+- Xiao, Rasul and Vollgraf's Fashion-MNIST supplies labeled clothing images and an official test split. The fixed stratified subset, training schedule and retain-only comparison are defined by this project. [Fashion-MNIST paper](https://arxiv.org/abs/1708.07747) · [Experiment protocol](fashion-audit.md)
 - Alpaydin and Kaynak's UCI handwritten digits dataset is supplied by scikit-learn's `load_digits`. The examples remove exact duplicate feature rows and scale the pixels. The SGD demo predicts digit labels, and the ridge benchmark derives a parity target. [UCI dataset](https://doi.org/10.24432/C50P49) · [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) · [scikit-learn data loader](https://scikit-learn.org/stable/modules/generated/sklearn.datasets.load_digits.html)
 - The CPU classifier uses scikit-learn's `SGDClassifier.partial_fit`. The ridge examples use scikit-learn for independent SVD refits and NumPy for sufficient statistics and linear solves. The demo environment pins its direct and transitive dependencies. [SGDClassifier API](https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.SGDClassifier.html) · [Pinned demo dependencies](../examples/requirements-demo.txt)

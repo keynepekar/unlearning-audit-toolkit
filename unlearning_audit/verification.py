@@ -11,6 +11,7 @@ from .validation import LossExport
 def verify_comparison(
     document: object, export: LossExport, manifest: Manifest, *,
     group_assignments: dict[str, str] | None = None,
+    bootstrap_backend: str = "python",
 ) -> None:
     saved, _ = validate_metrics(document)
     recorded = saved.get("fingerprints")
@@ -34,6 +35,7 @@ def verify_comparison(
         include_loss_gaps="loss_gaps" in saved, **saved["bootstrap"],
         group_assignments=group_assignments,
         iid_holdout="holdout_fpr_bound" in saved,
+        bootstrap_backend=bootstrap_backend,
     )
     # The normalized inputs and, when applicable, the group partition already matched.
     replayed["fingerprints"] = expected

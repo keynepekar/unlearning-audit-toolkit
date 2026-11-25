@@ -30,11 +30,11 @@ Open `report.html` in a browser. For downstream analysis, run `unlearning-audit 
 
 ### Install the release wheel
 
-Download the `.whl` file from the [v0.7.0 release](https://github.com/keynepekar/unlearning-audit-toolkit/releases/tag/v0.7.0). Verify its build provenance with the GitHub CLI before installing.
+Download the `.whl` file from the [v0.8.0 release](https://github.com/keynepekar/unlearning-audit-toolkit/releases/tag/v0.8.0). Verify its build provenance with the GitHub CLI before installing.
 
 ```sh
-gh attestation verify unlearning_audit_toolkit-0.7.0-py3-none-any.whl --repo keynepekar/unlearning-audit-toolkit --source-ref refs/tags/v0.7.0
-python -m pip install --no-index --no-deps unlearning_audit_toolkit-0.7.0-py3-none-any.whl
+gh attestation verify unlearning_audit_toolkit-0.8.0-py3-none-any.whl --repo keynepekar/unlearning-audit-toolkit --source-ref refs/tags/v0.8.0
+python -m pip install --no-index --no-deps unlearning_audit_toolkit-0.8.0-py3-none-any.whl
 ```
 
 ## Reproduce the screenshot
@@ -66,6 +66,8 @@ Use [grouped AUC intervals](docs/methodology.md#grouped-observations) when sever
 
 For independently calibrated thresholds, see [upper FPR bounds](docs/fpr-bounds.md). The [large audit benchmark](docs/large-audits.md) covers a million-row CSV and compact HTML rendering.
 
+For faster resampling, install `.[fast]` from the repository and pass `--bootstrap-backend numpy` to `compare` or `verify`. Both backends use the same draws and preserve the metrics JSON format. [Grouped benchmark and setup](docs/bootstrap-backend.md)
+
 ## When ROC AUC misses a change
 
 The [ridge control experiment](docs/ridge-controls.md) compares an exact update with an unchanged model. Both have the same ROC AUC on the synthetic benchmark. The paired loss gaps and the independently retrained model reveal the difference.
@@ -79,6 +81,8 @@ The [sequential experiments](docs/sequential-experiment.md) compare repeated upd
 The [Wine locality experiment](docs/wine-locality.md) measures where prediction discrepancies occur after the same deletion.
 
 The [CNN locality experiment](docs/cnn-locality.md) measures prediction and embedding differences against independently retrained models on UCI Digits.
+
+The [Fashion-MNIST experiment](docs/fashion-audit.md) measures a positive membership control and compares a retain-only fine-tune with retraining across six CUDA runs.
 
 The reusable [scikit-learn export example](examples/sklearn_export.py) converts fitted probability classifiers and labeled cohorts to the toolkit's CSV format. The digits demo uses it.
 
