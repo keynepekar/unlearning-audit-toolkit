@@ -40,6 +40,12 @@ class MetricsTests(unittest.TestCase):
         self.assertEqual(area_under_roc(roc_counts((0.8,), (0.1,))), 0)
         self.assertEqual(area_under_roc(roc_counts((0.1,), (0.1,))), 0.5)
 
+    def test_large_tied_curves_preserve_shared_and_class_specific_thresholds(self):
+        forget, holdout = (0.1, 0.3, 0.3) * 6000, (0.2, 0.3, 0.5) * 6000
+        self.assertEqual(roc_counts(forget, holdout), [
+            (0, 0), (0, 6000), (6000, 6000), (12000, 18000), (18000, 18000),
+        ])
+
     def test_tied_threshold_cannot_exceed_budget(self):
         points = roc_counts((0.1, 0.2), (0.2, 0.2, 0.8))
         result = operating_points(points, (0.1, 0.5, 0.7))

@@ -24,6 +24,8 @@ The update lowered the mean prediction gap in all three bands. The far band stil
 
 The RTX 3050 Laptop run took 291 seconds with PyTorch 2.15.0 and CUDA 13.2. Peak memory tracked by the PyTorch CUDA allocator was 33.8 MiB. The [release archive](https://github.com/keynepekar/unlearning-audit-toolkit/releases/download/v0.7.0/experiment-results-v070.zip) includes all 216 band comparisons and the run configuration.
 
+The training loop transfers the permutation of row indices once per epoch and slices it on the device. This keeps each batch and its order intact. A CUDA rerun of seed 42 matched the archived losses, manifest, audit metrics and locality table byte for byte.
+
 ## Reproduce
 
 Install the demo dependencies in an isolated Python 3.12 environment.

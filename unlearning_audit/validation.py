@@ -76,8 +76,8 @@ def load_losses(path: Path) -> LossExport:
         raise ValueError("both forget and holdout cohorts are required")
 
     grouped: dict[str, list[str]] = {}
-    for sample, cohort in sorted(samples.items()):
-        grouped.setdefault(cohort, []).append(sample)
+    for sample in sorted(samples):
+        grouped.setdefault(samples[sample], []).append(sample)
     ids = {cohort: tuple(grouped[cohort]) for cohort in sorted(grouped)}
     aligned = {
         model: {cohort: tuple(values[sample] for sample in group) for cohort, group in ids.items()}

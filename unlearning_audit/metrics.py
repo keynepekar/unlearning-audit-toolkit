@@ -1,6 +1,7 @@
 """Descriptive ROC statistics for aligned, labeled loss exports."""
 
 from bisect import bisect_left, bisect_right
+from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
 from itertools import accumulate, groupby, pairwise
@@ -23,13 +24,32 @@ class RocPoint(NamedTuple):
     true_positives: int
 
 
+def _small_histogram(losses: tuple[float, ...]) -> Counter[float] | None:
+    """Probe in bounded chunks so distinct scores do not build a large hash table."""
+    counts = Counter()
+    for start in range(0, len(losses), 16_384):
+        counts.update(losses[start:start + 16_384])
+        if len(counts) > 4096:
+            return None
+    return counts
+
+
 def roc_counts(forget: tuple[float, ...], holdout: tuple[float, ...]) -> list[RocPoint]:
     """Walk distinct loss thresholds. Equal losses enter the curve together."""
     if not forget or not holdout:
         raise ValueError("ROC requires both forget and holdout losses")
-    ranked = sorted([(loss, True) for loss in forget] + [(loss, False) for loss in holdout])
     points = [RocPoint(0, 0)]
     false_positives = true_positives = 0
+    if len(forget) + len(holdout) >= 4096 and (members := _small_histogram(forget)) is not None:
+        nonmembers = _small_histogram(holdout)
+        if nonmembers is not None:
+            for loss in sorted(members.keys() | nonmembers.keys()):
+                true_positives += members[loss]
+                false_positives += nonmembers[loss]
+                points.append(RocPoint(false_positives, true_positives))
+            return points
+
+    ranked = sorted([(loss, True) for loss in forget] + [(loss, False) for loss in holdout])
     for _, group in groupby(ranked, key=lambda item: item[0]):
         for _, is_forget in group:
             true_positives += is_forget

@@ -48,8 +48,8 @@ def train(model, images, labels, rows, *, seed, epochs, learning_rate):
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
     model.train()
     for _ in range(epochs):
-        for indices in np.array_split(rng.permutation(rows), (len(rows) + BATCH - 1) // BATCH):
-            batch = torch.as_tensor(indices, device=images.device)
+        order = torch.as_tensor(rng.permutation(rows), device=images.device)
+        for batch in order.tensor_split((len(rows) + BATCH - 1) // BATCH):
             optimizer.zero_grad(set_to_none=True)
             logits, _ = model(images[batch])
             F.cross_entropy(logits, labels[batch]).backward()

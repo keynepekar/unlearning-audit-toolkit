@@ -4,6 +4,8 @@ The bootstrap uses the same random draws for all three models. For mostly distin
 
 The offline HTML compacts dense ROC curves on the chart's display grid. It retains the first and last point in every occupied cell, plus the exact coordinates of reported descriptive and calibrated operating points. A straight segment between two retained points in one cell stays inside that cell. The JSON and ROC CSV retain every point.
 
+For large inputs with few distinct scores, ROC construction counts occurrences by score and walks the sorted distinct thresholds. The histogram probe stops after a batch brings a cohort above 4,096 distinct scores. Inputs with a wider score range use the general sort. Both paths keep all tied rows together and retain every ROC point.
+
 ## Measured comparison
 
 We ran a grouped audit with 350,000 samples, 1,050,000 CSV rows, mostly distinct scores and 400 bootstrap repetitions. On one Windows Intel Core i7-12700H system, v0.6.0 took 104.36 seconds and the optimized run took 57.53 seconds. The generated metrics JSON matched byte for byte. The corresponding HTML went from 14,263,114 to 70,002 bytes in the measured run. These are wall-clock observations from single runs on the same machine.
